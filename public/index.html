@@ -1,31 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+<link rel="stylesheet" href="style.css">
 <head>
     <title>MusiCo - Ad-Free Streaming</title>
-    <style>
-        body { background: #121212; color: white; font-family: sans-serif; padding: 20px; }
-        .track { background: #181818; padding: 15px; margin: 10px 0; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-        .track:hover { background: #282828; }
-        audio { width: 100%; margin-top: 20px; }
-    </style>
 </head>
 <body>
-    <h1>MusiCo Player</h1>
-    <div id="playlist">
-        <div class="track" onclick="playSong('YOUR_MEGA_URL_HERE')">
-            <strong>Example Track</strong> - Click to Play
+    <div class="player-bar">
+        <div class="custom-controls">
+            <button id="prev-btn">⏮</button>
+            <button id="play-btn" onclick="toggle_play()">▶</button>
+            <button id="next-btn">⏭</button>
+            
+            <span id="current-time">0:00</span>
+            <input type="range" id="progress-bar" value="0" max="100">
+            <span id="total-time">0:00</span>
         </div>
+
+        <div id="now-playing">
+            <div id="np-title">no song playing</div>
+            <div id="np-artist"></div>
+        </div>
+        <audio id="audio-player"></audio>
     </div>
 
-    <audio id="player" controls></audio>
-
-    <script>
-        function playSong(megaUrl) {
-            const player = document.getElementById('player');
-            // Points to your Node server endpoint
-            player.src = `/stream?url=${encodeURIComponent(megaUrl)}`;
-            player.play();
-        }
-    </script>
+    <div class="layout">
+        <nav class="sidebar">
+            <h2>musico</h2>
+            <p>private vault</p>
+            <input type="text" id="search-box" placeholder="search songs..." onkeyup="filter_songs()">
+        </nav>
+        <main class="content">
+            <h1>all songs</h1>
+            <div id="track-list">loading tracks...</div>
+        </main>
+    </div>
 </body>
 </html>

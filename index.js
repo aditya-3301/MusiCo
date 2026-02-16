@@ -69,4 +69,4 @@ app.get('/stream', async (req, res) => {
     }
 });
 
-app.listen(port, () => console.log('running on ' + port));
+app.listen(port, () => console.log('server running on http://localhost:' + port));
