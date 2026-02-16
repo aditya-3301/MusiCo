@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>MusiCo - Ad-Free Streaming</title>
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; padding: 20px; }
+        .track { background: #181818; padding: 15px; margin: 10px 0; border-radius: 8px; cursor: pointer; transition: 0.3s; }
+        .track:hover { background: #282828; }
+        audio { width: 100%; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>MusiCo Player</h1>
+    <div id="playlist">
+        <div class="track" onclick="playSong('YOUR_MEGA_URL_HERE')">
+            <strong>Example Track</strong> - Click to Play
+        </div>
+    </div>
+
+    <audio id="player" controls></audio>
+
+    <script>
+        function playSong(megaUrl) {
+            const player = document.getElementById('player');
+            // Points to your Node server endpoint
+            player.src = `/stream?url=${encodeURIComponent(megaUrl)}`;
+            player.play();
+        }
+    </script>
+</body>
+</html>
