@@ -17,7 +17,7 @@
         </div>
 
         <div id="now-playing">
-            <div id="np-title">no song playing</div>
+            <div id="np-title">PLAY SOMETHING to show it here idiot</div>
             <div id="np-artist"></div>
         </div>
         <audio id="audio-player"></audio>
@@ -25,14 +25,94 @@
 
     <div class="layout">
         <nav class="sidebar">
-            <h2>musico</h2>
-            <p>private vault</p>
-            <input type="text" id="search-box" placeholder="search songs..." onkeyup="filter_songs()">
+            <h2>Welcome, Aditya</h2>
+            <input type="text" id="search-box" placeholder="Search" onkeyup="filter_songs()">
         </nav>
         <main class="content">
-            <h1>all songs</h1>
+            <h1>All Songs in folder: Main</h1>
             <div id="track-list">loading tracks...</div>
         </main>
     </div>
+    <script>
+        const user = prompt("username:");
+        const pass = prompt("password:");
+
+        async function load_tracks() {
+            const res = await fetch(`/api/playlist?user=${user}&pass=${pass}`);
+            if (!res.ok) return document.getElementById('track-list').innerText = "wrong login.";
+            
+            const list = await res.json();
+            const container = document.getElementById('track-list');
+            container.innerHTML = '';
+
+            list.forEach(raw_item => {
+                let artist = "unknown artist";
+                let title = raw_item;
+                
+                if (raw_item.includes('-')) {
+                    const parts = raw_item.split('-');
+                    artist = parts[0].trim();
+                    title = parts.slice(1).join('-').trim(); 
+                }
+
+                const div = document.createElement('div');
+                div.className = 'track-item';
+                div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
+                div.onclick = () => play_song(raw_item, title, artist);
+                container.appendChild(div);
+            });
+        }
+
+        function play_song(raw_name, title, artist) {
+            document.getElementById('np-title').innerText = title;
+            document.getElementById('np-artist').innerText = artist;
+            const player = document.getElementById('audio-player');
+            player.src = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}`;
+            player.play();
+        }
+
+        function filter_songs() {
+            const query = document.getElementById('search-box').value.toLowerCase();
+            const tracks = document.querySelectorAll('.track-item');
+            tracks.forEach(track => {
+                const text = track.innerText.toLowerCase();
+                track.style.display = text.includes(query) ? 'flex' : 'none';
+            });
+        }
+
+        const audio = document.getElementById('audio-player');
+        const play_btn = document.getElementById('play-btn');
+        const progress = document.getElementById('progress-bar');
+        const current_time_text = document.getElementById('current-time');
+        const total_time_text = document.getElementById('total-time');
+
+        function toggle_play() {
+            if (audio.paused) audio.play();
+            else audio.pause();
+        }
+
+        audio.addEventListener('play', () => play_btn.innerText = '⏸');
+        audio.addEventListener('pause', () => play_btn.innerText = '▶');
+
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration) {
+                progress.value = (audio.currentTime / audio.duration) * 100;
+                current_time_text.innerText = format_time(audio.currentTime);
+                total_time_text.innerText = format_time(audio.duration);
+            }
+        });
+
+        progress.addEventListener('input', () => {
+            audio.currentTime = (progress.value / 100) * audio.duration;
+        });
+
+        function format_time(seconds) {
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        load_tracks();
+    </script>
 </body>
 </html>

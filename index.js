@@ -8,8 +8,8 @@ const app = express();
 const port = process.env.port || 3000;
 
 // auth stuff for vercel
-const user_auth = process.env.admin_user || 'aditya'; 
-const pass_auth = process.env.admin_pass || 'musicopass'; 
+const user_auth = process.env.admin_user || '.'; 
+const pass_auth = process.env.admin_pass || '.'; 
 let mega_storage;
 
 app.use(express.static('public'));
