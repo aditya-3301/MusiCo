@@ -1,75 +1,197 @@
-body { margin: 0; font-family: sans-serif; background: #0b0f19; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* --- GLASS VARIABLES --- */
+:root {
+    --bg-tint: transparent; /* Default is transparent */
+    --glass-bg: color-mix(in oklab, var(--bg-tint) 80%, transparent);
+    --glass-border: color-mix(in oklab, var(--glass-bg) 70%, white);
+}
 
-/* header player fixed to top */
-/* header player fixed to top with liquid glass */
+/* To make buttons "Black Tinted", you can add this class to them in HTML */
+.glass-tint-black { --bg-tint: black; }
+.glass-tint-muted { --bg-tint: rgba(255, 255, 255, 0.1); }
+/* --- BASE LAYOUT --- */
+body { 
+    margin: 0; 
+    font-family: sans-serif; 
+    background: transparent; /* <- Removed the solid color */
+    color: #fff; 
+    display: flex; 
+    flex-direction: column; 
+    height: 100vh; 
+    overflow: hidden; 
+}
+
+/* This creates a background wall specifically for the dots */
+#particles-js {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: #0b0f19;
+    z-index: -10 !important;
+    pointer-events: none;
+}
+/* --- TOP HEADER PLAYER --- */
 .player-bar { 
     width: 100%; 
-    height: 95px; 
-    background: rgba(17, 24, 39, 0.6); 
-    backdrop-filter: blur(16px); 
-    -webkit-backdrop-filter: blur(16px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05); 
+    min-height: 125px;  
     display: flex; 
     flex-direction: column; 
     justify-content: center; 
     align-items: center; 
-    padding: 10px 20px; 
+    padding: 15px 20px; 
     box-sizing: border-box; 
-    gap: 8px; 
+    gap: 12px; 
     z-index: 10; 
+    position: relative; /* REQUIRED so the background layer stays inside */
 }
-.layout { display: flex; flex: 1; overflow: hidden; }
-.sidebar { width: 220px; background: #111827; padding: 20px; border-right: 1px solid #1f2937; }
-.content { flex: 1; padding: 20px; overflow-y: auto; background: linear-gradient(to bottom, #1f2937, #0b0f19); }
 
-/* smooth track items */
-.track-item { 
-    display: flex; 
-    flex-direction: column; 
-    padding: 14px 18px; 
-    margin-bottom: 10px; 
-    background: rgba(255, 255, 255, 0.02); 
-    border-radius: 14px; /* smoothed out */
-    border: 1px solid transparent;
-    cursor: pointer; 
-    transition: 0.2s ease;
+/* This background layer puts the blur BEHIND your liquid pill */
+.player-bar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.4); 
+    backdrop-filter: blur(5px); 
+    -webkit-backdrop-filter: blur(5px);
+    z-index: -1;
+    pointer-events: none; /* Ensures you can still click the player! */
 }
-.track-item:hover { 
-    background: rgba(255, 255, 255, 0.06); 
-    border-top: 1px solid rgba(255, 255, 255, 0.1); /* mini sheen on hover */
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-}
-.track-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
-.track-artist { color: #9ca3af; font-size: 13px; }
 
-#now-playing { text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#np-title { font-weight: bold; font-size: 14px; margin-bottom: 2px; }
-#np-artist { color: #9ca3af; font-size: 12px; }
-
-/* glass rectangular smooth border for the controls */
+/* --- 1. THE LIQUID TRAY CONTAINER --- */
 .custom-controls { 
+    position: relative; 
     display: flex; 
     align-items: center; 
     gap: 15px; 
     width: 100%; 
     max-width: 550px; 
     justify-content: center; 
-    padding: 10px 25px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%);
-    backdrop-filter: blur(10px);
-    border-radius: 20px; /* smooth corners */
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-top: 1px solid rgba(255, 255, 255, 0.15); /* the sheen */
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 12px 25px;
+    border-radius: 20px;
     box-sizing: border-box;
+    cursor: grab; 
+    
+    /* Softened shadow so it doesn't darken the background */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    z-index: 10;
 }
-.custom-controls button { background: none; border: none; color: white; font-size: 20px; cursor: pointer; transition: 0.2s; }
-.custom-controls button:hover { color: #1db954; }
 
-#progress-bar { flex: 1; cursor: pointer; accent-color: #1db954; }
+.custom-controls:active {
+    cursor: grabbing;
+}
+
+/* 🟢 LAYER 1: The Water Base (Ultra Transparent) */
+/* 🟢 LAYER 1: The Glass Base (Ultra Transparent, less blur) */
+.custom-controls::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.01);
+    /* Lowered blur from 4px to 2px for a sharper look */
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    filter: url(#glass-blur); 
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* 🟢 LAYER 2: The Shiny Rim (Softer reflections) */
+.custom-controls::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    /* Softened white edges */
+    box-shadow: inset 2px 2px 3px 0 rgba(255, 255, 255, 0.08),
+                inset -2px -2px 3px 0 rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.08); 
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Keep the buttons and progress bar ABOVE the liquid background */
+.custom-controls > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- 2. THE LIQUID BUTTONS --- */
+.custom-controls button { 
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    
+    /* Shape & Spacing */
+    padding: 10px 20px;
+    border-radius: 24px; 
+    
+    /* Text & Font */
+    color: white; 
+    font-weight: 600;
+    cursor: pointer; 
+    
+    /* 🟢 FIX: Combined your two box-shadows with a comma so the inset works! */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2), 
+                inset 0 1px 1px 0 rgba(255, 255, 255, 0.2); 
+    
+    /* Animation */
+    transition: all 0.3s ease;
+}
+
+.custom-controls button:hover { 
+    transform: scale(1.1); 
+    color: #1db954; 
+    border-color: rgba(255, 255, 255, 0.4);
+    /* Enhances the liquid glow when hovered */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3), 
+                inset 0 1px 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* --- 3. PROGRESS BAR --- */
+#progress-bar { 
+    flex: 1; 
+    cursor: pointer; 
+    accent-color: #0392ff; 
+}
 #current-time, #total-time { font-size: 12px; color: #9ca3af; min-width: 35px; text-align: center; }
 
-/* liquid glass frosted search bar */
+/* --- NOW PLAYING TEXT --- */
+#now-playing { 
+    text-align: center; 
+    width: 100%; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+}
+#np-title { display: inline-block; font-weight: 600; font-size: 15px; color: white; }
+#np-artist { display: inline-block; color: #9ca3af; font-size: 13px; margin-left: 8px; }
+#np-artist:not(:empty)::before { content: "•"; margin-right: 8px; color: #4b5563; }
+
+/* --- TRACK LIST --- */
+.track-item { 
+    display: flex; 
+    flex-direction: column; 
+    padding: 14px 18px; 
+    margin-bottom: 10px; 
+    background: rgba(255, 255, 255, 0.02); 
+    border-radius: 14px; 
+    border: 1px solid transparent;
+    cursor: pointer; 
+    transition: 0.2s ease;
+}
+.track-item:hover { 
+    background: rgba(255, 255, 255, 0.06); 
+    border-top: 1px solid rgba(255, 255, 255, 0.1); 
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+.track-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.track-artist { color: #9ca3af; font-size: 13px; }
+
+/* --- SEARCH BAR --- */
 #search-box { 
     width: 100%; 
     padding: 12px 15px; 
@@ -85,10 +207,35 @@ body { margin: 0; font-family: sans-serif; background: #0b0f19; color: #fff; dis
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: 0.3s;
 }
-
 #search-box:focus {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.3);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 #search-box::placeholder { color: #9ca3af; }
+/* --- MAIN LAYOUT (SIDEBAR & CONTENT) --- */
+.layout { 
+    display: flex; 
+    flex: 1; 
+    overflow: hidden; 
+}
+
+.sidebar { 
+    width: 220px; 
+    background: rgba(17, 24, 39, 0.288); /* See-through for dots */
+    padding: 20px; 
+    border-right: 1px solid rgba(255, 255, 255, 0.05); 
+    backdrop-filter: blur(4px); 
+    -webkit-backdrop-filter: blur(4px);
+    box-sizing: border-box;
+}
+
+.content { 
+    flex: 1; 
+    padding: 20px; 
+    overflow-y: auto; 
+    /* See-through gradient for dots */
+    background: linear-gradient(to bottom, rgba(31, 41, 55, 0.2), rgba(11, 15, 25, 0.6)); 
+    padding-bottom: 100px; 
+    box-sizing: border-box;
+}

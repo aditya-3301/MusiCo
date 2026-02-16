@@ -3,13 +3,16 @@
 <link rel="stylesheet" href="style.css">
 <head>
     <title>MusiCo - Ad-Free Streaming</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
 </head>
 <body>
+    <div id="particles-js"></div>
     <div class="player-bar">
         <div class="custom-controls">
             <button id="prev-btn">⏮</button>
-            <button id="play-btn" onclick="toggle_play()">▶</button>
-            <button id="next-btn">⏭</button>
+            <button id="play-btn" class="glass-tint-black" onclick="toggle_play()">▶</button>
+            <button id="next-btn" class="glass-tint-muted">⏭</button>
             
             <span id="current-time">0:00</span>
             <input type="range" id="progress-bar" value="0" max="100">
@@ -114,5 +117,46 @@
 
         load_tracks();
     </script>
+    <script src="particles.js"></script>
+    <script>
+        // This fires up the local file you just created
+        particlesJS("particles-js", {
+            "particles": {
+                "number": { "value": 80 },
+                "color": { "value": "#ffffff" },
+                "shape": { "type": "circle" },
+                "opacity": { "value": 0.5 },
+                "size": { "value": 3 },
+                "line_linked": { "enable": true, "distance": 150, "color": "#ffffff", "opacity": 0.3, "width": 1 },
+                "move": { "enable": true, "speed": 1.5 }
+            },
+            "interactivity": {
+                "events": {
+                    "onhover": { "enable": true, "mode": "grab" }
+                }
+            }
+        });
+        // --- LIQUID GLASS DRAGGABLE ---
+        gsap.registerPlugin(Draggable);
+
+        Draggable.create(".custom-controls", {
+            type: "x, y",
+            // When you let go, snap back with a liquid bounce
+            onRelease: function () {
+                gsap.to(this.target, {
+                    x: 0,
+                    y: 0,
+                    duration: 1.5,
+                    ease: "elastic.out(1,0.3)"
+                });
+            }
+        });
+    </script>
+    <svg style="display: none" xmlns="http://www.w3.org/2000/svg">
+      <filter id="glass-blur" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
+        <feTurbulence type="fractalNoise" baseFrequency="0.003 0.007" numOctaves="1" result="turbulence" />
+        <feDisplacementMap in="SourceGraphic" in2="turbulence" scale="119" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </svg>
 </body>
 </html>
