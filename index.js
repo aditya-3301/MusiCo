@@ -7,26 +7,43 @@ const port = process.env.port || 3000;
 
 // auth stuff for vercel
 const user_auth = process.env.admin_user; 
-const pass_auth = process.env.admin_pass; 
-let mega_storage;
+const pass_auth = process.env.admin_pass;
 
 app.use(express.static('public'));
 
-// connect to mega
-async function start_mega() {
-    try {   
-        mega_storage = await new Storage({
-            email: process.env.mega_email,
-            password: process.env.mega_password,
-            autologin: true
-        }).ready;
-        console.log('connected to mega as ' + mega_storage.name);
-    } catch (e) {
-        // THIS IS THE FIX: Print the actual error message
-        console.error('login failed because:', e.message || e);
-    }
+let mega_storage = null;
+let connection_promise = null; // Prevents multiple requests from logging in at the same time
+
+// --- THE VERCEL FIX: Smart MEGA Connection Manager ---
+async function get_mega_client() {
+    // 1. If connected, return instantly
+    if (mega_storage) return mega_storage;
+    
+    // 2. If currently logging in, wait for that to finish
+    if (connection_promise) return connection_promise;
+
+    // 3. Otherwise, log in to MEGA and save the session
+    console.log("Waking up server: Connecting to MEGA...");
+    connection_promise = new Promise(async (resolve, reject) => {
+        try {   
+            const storage = await new Storage({
+                email: process.env.MEGA_EMAIL,       // Matches your .env uppercase
+                password: process.env.MEGA_PASSWORD, // Matches your .env uppercase
+                autologin: true
+            }).ready;
+            
+            mega_storage = storage;
+            console.log('Connected to MEGA as ' + mega_storage.name);
+            resolve(mega_storage);
+        } catch (e) {
+            console.error('MEGA login failed because:', e.message || e);
+            connection_promise = null; // Reset so we can try again
+            reject(e);
+        }
+    });
+
+    return connection_promise;
 }
-start_mega();
 
 // read the complete_filenames.txt file
 // read dynamically from MEGA main folder
@@ -35,7 +52,9 @@ app.get('/api/playlist', async (req, res) => {
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
     try {
-        const main_folder = mega_storage.root.children.find(f => f.name === 'main' && f.directory);
+        // Automatically wake up/connect to MEGA if Vercel went to sleep
+        const storage = await get_mega_client();
+        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
         if (!main_folder) return res.status(404).send('main folder missing');
 
         // Map through the children of the main folder to get filenames 
@@ -63,7 +82,9 @@ app.get('/stream', async (req, res) => {
     }
 
     try {
-        const main_folder = mega_storage.root.children.find(f => f.name === 'main' && f.directory);
+        // Automatically wake up/connect to MEGA if Vercel went to sleep
+        const storage = await get_mega_client();
+        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
         if (!main_folder) return res.status(404).send('main folder missing');
 
         const clean_name = decodeURIComponent(filename);
