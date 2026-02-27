@@ -131,4 +131,5 @@ app.get('/stream', async (req, res) => {
     }
 });
 
-app.listen(port, () => console.log('server running on http://localhost:' + port));
+// Export the app for Vercel Serverless
+module.exports = app;
