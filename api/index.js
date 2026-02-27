@@ -6,38 +6,46 @@ const app = express();
 const port = process.env.port || 3000;
 
 // auth stuff for vercel
-const user_auth = process.env.admin_user.trim(); 
-const pass_auth = process.env.admin_pass.trim();
+const user_auth = process.env.admin_user; 
+const pass_auth = process.env.admin_pass;
 
 app.use(express.static('..'));
 
+// --- GLOBAL CONNECTION HELPERS ---
 let mega_storage = null;
-let connection_promise = null; // Prevents multiple requests from logging in at the same time
+let connection_promise = null;
 
-// --- THE VERCEL FIX: Smart MEGA Connection Manager ---
 async function get_mega_client() {
-    // 1. If connected, return instantly
+    // 1. If we already have a healthy connection, use it
     if (mega_storage) return mega_storage;
     
-    // 2. If currently logging in, wait for that to finish
+    // 2. If we are currently in the middle of logging in, wait for that
     if (connection_promise) return connection_promise;
 
-    // 3. Otherwise, log in to MEGA and save the session
-    console.log("Waking up server: Connecting to MEGA...");
+    console.log("Cold Start: Waking up MEGA connection...");
+    
     connection_promise = new Promise(async (resolve, reject) => {
+        // 12-second safety timeout (Vercel functions often time out at 15s)
+        const timeout = setTimeout(() => {
+            connection_promise = null;
+            reject(new Error("MEGA connection timed out - server took too long to wake up"));
+        }, 12000);
+
         try {   
             const storage = await new Storage({
-                email: process.env.MEGA_EMAIL,       // Matches your .env uppercase
-                password: process.env.MEGA_PASSWORD, // Matches your .env uppercase
+                email: process.env.MEGA_EMAIL,
+                password: process.env.MEGA_PASSWORD,
                 autologin: true
             }).ready;
             
+            clearTimeout(timeout);
             mega_storage = storage;
-            console.log('Connected to MEGA as ' + mega_storage.name);
+            console.log('Connected to MEGA successfully');
             resolve(mega_storage);
         } catch (e) {
-            console.error('MEGA login failed because:', e.message || e);
-            connection_promise = null; // Reset so we can try again
+            clearTimeout(timeout);
+            console.error('Login failed:', e.message);
+            connection_promise = null; // Reset so we can try again on next refresh
             reject(e);
         }
     });
@@ -45,31 +53,45 @@ async function get_mega_client() {
     return connection_promise;
 }
 
-// read the complete_filenames.txt file
-// read dynamically from MEGA main folder
+// --- THE REGENERATED PLAYLIST ROUTE ---
 app.get('/api/playlist', async (req, res) => {
     const { user, pass } = req.query;
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
     try {
-        // Automatically wake up/connect to MEGA if Vercel went to sleep
-        const storage = await get_mega_client();
-        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
-        if (!main_folder) return res.status(404).send('main folder missing');
+        let storage;
+        try {
+            // First attempt to get the client
+            storage = await get_mega_client();
+        } catch (err) {
+            // RETRY LOGIC: If the first attempt failed (common after sleep), 
+            // wipe everything and try one more time immediately.
+            console.log("First attempt failed, retrying...");
+            mega_storage = null;
+            connection_promise = null;
+            storage = await get_mega_client();
+        }
 
-        // Map through the children of the main folder to get filenames 
-        // and remove '.mp3' for a cleaner look in the frontend
+        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
+        if (!main_folder) {
+            // If the folder isn't found, the session might be stale. Reset it.
+            mega_storage = null;
+            return res.status(404).send('Main folder not found - session reset, please refresh');
+        }
+
         const songs = main_folder.children
-            .filter(f => !f.directory) // Ensure we only get files
-            .map(f => f.name.replace('.mp3', '')); 
+            .filter(f => !f.directory)
+            .map(f => f.name.replace('.mp3', '').replace('.m4a', '')); 
             
         res.json(songs);
     } catch (err) {
-        console.error(err);
-        res.status(500).send('failed to fetch files from mega');
+        console.error("Critical Playlist Error:", err);
+        // CRITICAL: Reset the globals so the NEXT person to visit gets a clean start
+        mega_storage = null;
+        connection_promise = null;
+        res.status(500).send('MEGA is waking up. Please refresh the page in 5 seconds.');
     }
 });
-
 // stream logic
 app.get('/stream', async (req, res) => {
     const { filename, user, pass } = req.query;
