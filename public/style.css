@@ -92,7 +92,7 @@ body {
     /* Lowered blur from 4px to 2px for a sharper look */
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    filter: url(#glass-blur); 
+    filter: url(#glass-blur-player);
     z-index: -2;
     pointer-events: none;
 }
@@ -195,7 +195,8 @@ body {
     background: rgba(255, 255, 255, 0.02);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    filter: url(#glass-blur); 
+    /* Inside .track-item::before */
+    filter: url(#glass-blur-track);
     z-index: -2; /* Puts the liquid behind the track text */
     pointer-events: none;
     transition: background 0.2s ease;
