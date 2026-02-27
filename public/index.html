@@ -8,12 +8,17 @@
 </head>
 <body>
     <div id="particles-js"></div>
+    
     <div class="player-bar">
+        
         <div class="custom-controls">
+            <button id="shuffle-btn" class="glass-tint-muted" onclick="toggle_shuffle()">🔀</button>
             <button id="prev-btn">⏮</button>
             <button id="play-btn" class="glass-tint-black" onclick="toggle_play()">▶</button>
             <button id="next-btn" class="glass-tint-muted">⏭</button>
-            
+        </div>
+        
+        <div class="progress-container">
             <span id="current-time">0:00</span>
             <input type="range" id="progress-bar" value="0" max="100">
             <span id="total-time">0:00</span>
@@ -32,7 +37,7 @@
             <input type="text" id="search-box" placeholder="Search" onkeyup="filter_songs()">
         </nav>
         <main class="content">
-            <h1>All Songs in folder: Main</h1>
+            <h1>All Songs in folder: mega/main</h1>
             <div id="track-list">loading tracks...</div>
         </main>
     </div>
@@ -40,11 +45,43 @@
         const user = prompt("username:");
         const pass = prompt("password:");
 
+        let current_playlist = [];
+        let current_track_index = -1;
+        let is_shuffle = false; // <-- NEW: Tracks if shuffle is on
+
+
+        // --- NEW: Toggle shuffle state and update button colors ---
+        function toggle_shuffle() {
+            is_shuffle = !is_shuffle;
+            const btn = document.getElementById('shuffle-btn');
+            
+            if (is_shuffle) {
+                // Solid white background when active
+                btn.classList.remove('glass-tint-muted');
+                btn.style.backgroundColor = 'white';
+                btn.style.color = 'black'; // Keep icon visible against white
+            } else {
+                // Revert to normal glass state when inactive
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+                btn.classList.add('glass-tint-muted');
+            }
+        }
+
+        
+        
         async function load_tracks() {
             const res = await fetch(`/api/playlist?user=${user}&pass=${pass}`);
-            if (!res.ok) return document.getElementById('track-list').innerText = "wrong login.";
+            if (!res.ok) {
+                const error_msg = await res.text();
+                console.error("Server Error:", error_msg);
+                document.getElementById('track-list').innerText = `Error ${res.status}: ${error_msg}`;
+                return;
+            }
             
             const list = await res.json();
+            current_playlist = list; // <-- NEW: Store the playlist globally
+            
             const container = document.getElementById('track-list');
             container.innerHTML = '';
 
@@ -67,6 +104,8 @@
         }
 
         function play_song(raw_name, title, artist) {
+            current_track_index = current_playlist.indexOf(raw_name); // <-- NEW: Track the current song index
+            
             document.getElementById('np-title').innerText = title;
             document.getElementById('np-artist').innerText = artist;
             const player = document.getElementById('audio-player');
@@ -89,6 +128,56 @@
         const current_time_text = document.getElementById('current-time');
         const total_time_text = document.getElementById('total-time');
 
+        
+        function play_next() {
+            if (current_playlist.length === 0) return;
+            
+            if (is_shuffle && current_playlist.length > 1) {
+                // Pick a random track that IS NOT the currently playing track
+                let random_index = current_track_index;
+                while (random_index === current_track_index) {
+                    random_index = Math.floor(Math.random() * current_playlist.length);
+                }
+                current_track_index = random_index;
+            } else {
+                // Normal sequential play
+                current_track_index++;
+                if (current_track_index >= current_playlist.length) current_track_index = 0; // Loop back to start
+            }
+            
+            load_track_from_index(current_track_index);
+        }
+
+        function play_prev() {
+            if (current_playlist.length === 0) return;
+            current_track_index--;
+            if (current_track_index < 0) current_track_index = current_playlist.length - 1; // Loop to end
+            
+            load_track_from_index(current_track_index);
+        }
+
+        function load_track_from_index(index) {
+            const raw_name = current_playlist[index];
+            let artist = "unknown artist";
+            let title = raw_name;
+            
+            if (raw_name.includes('-')) {
+                const parts = raw_name.split('-');
+                artist = parts[0].trim();
+                title = parts.slice(1).join('-').trim(); 
+            }
+            play_song(raw_name, title, artist);
+        }
+
+        // Attach logic to the HTML buttons
+        document.getElementById('next-btn').addEventListener('click', play_next);
+        document.getElementById('prev-btn').addEventListener('click', play_prev);
+
+        // Auto-play the next song when the current one finishes
+        audio.addEventListener('ended', play_next);
+
+        
+
         function toggle_play() {
             if (audio.paused) audio.play();
             else audio.pause();
@@ -97,6 +186,36 @@
         audio.addEventListener('play', () => play_btn.innerText = '⏸');
         audio.addEventListener('pause', () => play_btn.innerText = '▶');
 
+        // Unified Error Handling: Auto-skip corrupted files or failed streams
+        audio.addEventListener('error', () => {
+            console.error("Playback error: File corrupted or MEGA stream failed.");
+            
+            // Update UI to show error
+            document.getElementById('np-title').innerText = "⚠️ Stream error / Corrupted file. Skipping...";
+            play_btn.innerText = '▶'; 
+            
+            // Wait 1.5 seconds so the user sees the message, then auto-skip
+            setTimeout(() => {
+                play_next();
+            }, 1500);
+        });
+
+        // Add a buffering indicator when the stream is stalled or loading
+        let current_track_title = ""; // Store title to restore it after buffering
+        
+        audio.addEventListener('waiting', () => {
+            current_track_title = document.getElementById('np-title').innerText;
+            if (current_track_title !== "STREAM ERROR - Try again") {
+                document.getElementById('np-title').innerText = "Buffering stream...";
+            }
+        });
+
+        audio.addEventListener('playing', () => {
+            if (current_track_title && document.getElementById('np-title').innerText === "Buffering stream...") {
+                document.getElementById('np-title').innerText = current_track_title;
+            }
+        });
+        
         audio.addEventListener('timeupdate', () => {
             if (audio.duration) {
                 progress.value = (audio.currentTime / audio.duration) * 100;

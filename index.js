@@ -1,8 +1,6 @@
 require('dotenv').config();
 const express = require('express');
 const { Storage } = require('megajs');
-const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const port = process.env.port || 3000;
@@ -16,7 +14,7 @@ app.use(express.static('public'));
 
 // connect to mega
 async function start_mega() {
-    try {
+    try {   
         mega_storage = await new Storage({
             email: process.env.mega_email,
             password: process.env.mega_password,
@@ -24,24 +22,32 @@ async function start_mega() {
         }).ready;
         console.log('connected to mega as ' + mega_storage.name);
     } catch (e) {
-        console.log('login failed');
+        // THIS IS THE FIX: Print the actual error message
+        console.error('login failed because:', e.message || e);
     }
 }
 start_mega();
 
 // read the complete_filenames.txt file
-app.get('/api/playlist', (req, res) => {
+// read dynamically from MEGA main folder
+app.get('/api/playlist', async (req, res) => {
     const { user, pass } = req.query;
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
     try {
-        const file_path = path.join(__dirname, 'Complete_filenames.txt');
-        const data = fs.readFileSync(file_path, 'utf8');
-        // split by lines and clean up empty ones
-        const songs = data.split('\n').map(s => s.trim()).filter(s => s !== '');
+        const main_folder = mega_storage.root.children.find(f => f.name === 'main' && f.directory);
+        if (!main_folder) return res.status(404).send('main folder missing');
+
+        // Map through the children of the main folder to get filenames 
+        // and remove '.mp3' for a cleaner look in the frontend
+        const songs = main_folder.children
+            .filter(f => !f.directory) // Ensure we only get files
+            .map(f => f.name.replace('.mp3', '')); 
+            
         res.json(songs);
     } catch (err) {
-        res.status(500).send('cant find the txt file');
+        console.error(err);
+        res.status(500).send('failed to fetch files from mega');
     }
 });
 
@@ -51,20 +57,55 @@ app.get('/stream', async (req, res) => {
     
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
+    // Prevent crashing if MEGA hasn't finished logging in yet
+    if (!mega_storage || !mega_storage.root) {
+        return res.status(503).send('MEGA is still connecting, try again in a few seconds');
+    }
+
     try {
         const main_folder = mega_storage.root.children.find(f => f.name === 'main' && f.directory);
         if (!main_folder) return res.status(404).send('main folder missing');
 
-        // we look for the filename. if your mega files dont have .mp3 in the txt, we add it here
         const clean_name = decodeURIComponent(filename);
-        const song_file = main_folder.children.find(f => f.name === clean_name || f.name === clean_name + '.mp3');
+        // Look for exact match, .mp3, or .m4a
+        const song_file = main_folder.children.find(f => 
+            f.name === clean_name || 
+            f.name === clean_name + '.mp3' ||
+            f.name === clean_name + '.m4a'
+        );
         
         if (!song_file) return res.status(404).send('song not in mega');
 
-        res.setHeader('content-type', 'audio/mpeg');
-        const download_stream = song_file.download();
-        download_stream.pipe(res);
+        // --- NEW: Handle Browser Range Requests for Buffering ---
+        const size = song_file.size;
+        const range = req.headers.range;
+
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
+            const chunksize = (end - start) + 1;
+
+            res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${size}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': 'audio/mpeg',
+            });
+            
+            const download_stream = song_file.download({ start, end });
+            download_stream.pipe(res);
+        } else {
+            res.writeHead(200, {
+                'Content-Length': size,
+                'Content-Type': 'audio/mpeg',
+            });
+            const download_stream = song_file.download();
+            download_stream.pipe(res);
+        }
+
     } catch (error) {
+        console.error("Stream crash:", error);
         res.status(500).send('stream error');
     }
 });
