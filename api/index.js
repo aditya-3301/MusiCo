@@ -82,7 +82,7 @@ app.get('/api/playlist', async (req, res) => {
         
         // --- THIS IS THE CRITICAL FIX ---
         // Instead of a generic message, print the ACTUAL reason to the screen!
-        res.status(500).send(`Error 500: The real error is -> ${err.message}`);
+        res.status(500).send(`Error 500: The real error is -> ${err.message}\n\nIf it says EBLOCKED, i have to change my mega password(Its a very rare error)`);
     }
 });
 
