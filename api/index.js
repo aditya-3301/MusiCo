@@ -49,7 +49,6 @@ async function get_mega_client() {
     return connection_promise;
 }
 
-// --- THE REGENERATED PLAYLIST ROUTE ---
 app.get('/api/playlist', async (req, res) => {
     const { user, pass } = req.query;
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
@@ -57,11 +56,8 @@ app.get('/api/playlist', async (req, res) => {
     try {
         let storage;
         try {
-            // First attempt to get the client
             storage = await get_mega_client();
         } catch (err) {
-            // RETRY LOGIC: If the first attempt failed (common after sleep), 
-            // wipe everything and try one more time immediately.
             console.log("First attempt failed, retrying...");
             mega_storage = null;
             connection_promise = null;
@@ -70,7 +66,6 @@ app.get('/api/playlist', async (req, res) => {
 
         const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
         if (!main_folder) {
-            // If the folder isn't found, the session might be stale. Reset it.
             mega_storage = null;
             return res.status(404).send('Main folder not found - session reset, please refresh');
         }
@@ -82,12 +77,15 @@ app.get('/api/playlist', async (req, res) => {
         res.json(songs);
     } catch (err) {
         console.error("Critical Playlist Error:", err);
-        // CRITICAL: Reset the globals so the NEXT person to visit gets a clean start
         mega_storage = null;
         connection_promise = null;
-        res.status(500).send('MEGA is waking up. Please refresh the page in 5 seconds.');
+        
+        // --- THIS IS THE CRITICAL FIX ---
+        // Instead of a generic message, print the ACTUAL reason to the screen!
+        res.status(500).send(`Error 500: The real error is -> ${err.message}`);
     }
 });
+
 // stream logic
 app.get('/stream', async (req, res) => {
     const { filename, user, pass } = req.query;
