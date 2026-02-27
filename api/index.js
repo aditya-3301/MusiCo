@@ -9,7 +9,7 @@ const port = process.env.port || 3000;
 const user_auth = process.env.admin_user; 
 const pass_auth = process.env.admin_pass;
 
-app.use(express.static('public'));
+app.use(express.static('..'));
 
 let mega_storage = null;
 let connection_promise = null; // Prevents multiple requests from logging in at the same time
@@ -131,5 +131,4 @@ app.get('/stream', async (req, res) => {
     }
 });
 
-// Export the app for Vercel Serverless
 module.exports = app;
