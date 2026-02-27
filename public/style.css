@@ -173,21 +173,43 @@ body {
 
 /* --- TRACK LIST --- */
 .track-item { 
+    position: relative; /* Required for the liquid background to attach properly */
     display: flex; 
     flex-direction: column; 
     padding: 14px 18px; 
     margin-bottom: 10px; 
-    background: rgba(255, 255, 255, 0.02); 
     border-radius: 14px; 
     border: 1px solid transparent;
     cursor: pointer; 
     transition: 0.2s ease;
+    z-index: 1; /* Creates a stacking context so text stays on top */
+    overflow: hidden; /* Prevents the liquid effect from bleeding outside the rounded corners */
 }
+
+/* 💧 NEW: The Liquid Glass Refraction Layer for Songs */
+.track-item::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    filter: url(#glass-blur); 
+    z-index: -2; /* Puts the liquid behind the track text */
+    pointer-events: none;
+    transition: background 0.2s ease;
+}
+
 .track-item:hover { 
-    background: rgba(255, 255, 255, 0.06); 
     border-top: 1px solid rgba(255, 255, 255, 0.1); 
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
+
+.track-item:hover::before { 
+    background: rgba(255, 255, 255, 0.06); /* Brightens the liquid on hover */
+}
+
 .track-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
 .track-artist { color: #9ca3af; font-size: 13px; }
 
