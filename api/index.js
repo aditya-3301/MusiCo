@@ -16,20 +16,18 @@ let mega_storage = null;
 let connection_promise = null;
 
 async function get_mega_client() {
-    // 1. If we already have a healthy connection, use it
     if (mega_storage) return mega_storage;
-    
-    // 2. If we are currently in the middle of logging in, wait for that
     if (connection_promise) return connection_promise;
 
-    console.log("Cold Start: Waking up MEGA connection...");
+    console.log("Waking up server...");
     
     connection_promise = new Promise(async (resolve, reject) => {
-        // 12-second safety timeout (Vercel functions often time out at 15s)
+        // --- THE KILL SWITCH ---
+        // If MEGA doesn't respond in 10 seconds, fail the promise
         const timeout = setTimeout(() => {
-            connection_promise = null;
-            reject(new Error("MEGA connection timed out - server took too long to wake up"));
-        }, 12000);
+            connection_promise = null; // Clear the hang
+            reject(new Error("MEGA_HANG: Connection timed out. Refresh now."));
+        }, 10000);
 
         try {   
             const storage = await new Storage({
@@ -38,14 +36,12 @@ async function get_mega_client() {
                 autologin: true
             }).ready;
             
-            clearTimeout(timeout);
+            clearTimeout(timeout); // Success! Stop the timer
             mega_storage = storage;
-            console.log('Connected to MEGA successfully');
             resolve(mega_storage);
         } catch (e) {
             clearTimeout(timeout);
-            console.error('Login failed:', e.message);
-            connection_promise = null; // Reset so we can try again on next refresh
+            connection_promise = null; // Error! Clear for retry
             reject(e);
         }
     });
