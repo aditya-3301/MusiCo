@@ -258,8 +258,17 @@
         // --- LIQUID GLASS DRAGGABLE ---
         gsap.registerPlugin(Draggable);
 
+        // --- LIQUID GLASS DRAGGABLE ---
+        gsap.registerPlugin(Draggable);
+
         Draggable.create(".custom-controls", {
             type: "x, y",
+            
+            // --- THE ANDROID FIX ---
+            dragClickables: false, // Ensures buttons can be clicked normally
+            minimumMovement: 10,   // Prevents slight finger wobbles from cancelling the tap
+            // -----------------------
+
             // When you let go, snap back with a liquid bounce
             onRelease: function () {
                 gsap.to(this.target, {
