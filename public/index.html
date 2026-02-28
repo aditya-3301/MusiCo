@@ -328,8 +328,16 @@
         Draggable.create("#playlist-wrapper", {
             type: "x, y",
             dragClickables: false, // Lets you click the folders inside it normally
-            minimumMovement: 10    
-            //No onRelease function here because i want it tto not move bruh
+            minimumMovement: 10,   
+            //Slower Onrelease fucntion
+            onRelease: function () {
+                gsap.to(this.target, {
+                    x: 0,
+                    y: 0,
+                    duration: 10,
+                    ease: "elastic.out(1,0.3)"
+                });
+            }
         });
     </script>
     
