@@ -271,8 +271,8 @@ body {
     margin-left: 20px; /* Gives some breathing room from the draggable buttons */
 }
 
-/*=========================================
- new commit: PLAYLIST & FOLDER UI*/
+/* ==============================================-----------------------------------------------
+   NEW: PLAYLIST & FOLDER UI*/
 
 #playlist-wrapper {
     position: relative;
@@ -282,7 +282,7 @@ body {
     width: 100%;
     box-sizing: border-box;
     cursor: grab;
-    z-index: 50; /* High z-index so when you drag it, it floats over the main content */
+    z-index: 9999; /* HIGHEST Z-INDEX to float above everything */
 }
 
 #playlist-wrapper:active {
@@ -315,14 +315,14 @@ body {
     pointer-events: none;
 }
 
-/* Container for the actual items (scrollable if you have many playlists) */
+/* Container for the actual items */
 #playlist-container {
     max-height: 300px;
     overflow-y: auto;
     padding-right: 5px;
 }
 
-/* Custom Scrollbar for the playlist */
+/* Custom Scrollbar */
 #playlist-container::-webkit-scrollbar { width: 4px; }
 #playlist-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
@@ -342,7 +342,7 @@ body {
     border: 1px solid transparent;
 }
 
-/* Add a little folder icon before the text */
+/* Folder Icon */
 .folder-item::before {
     content: "📁";
     margin-right: 10px;
@@ -352,8 +352,8 @@ body {
 
 .folder-item:hover {
     background: rgba(255, 255, 255, 0.1);
-    transform: translateX(4px); /* Slides right slightly when hovered */
-    color: #1db954; /* Spotify green text */
+    transform: translateX(4px); 
+    color: #1db954; 
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
