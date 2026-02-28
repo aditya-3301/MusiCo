@@ -2,7 +2,7 @@
 <html lang="en">
 <link rel="stylesheet" href="style.css">
 <head>
-    <title>MusiCo - Ad-Free Streaming</title>
+    <title>MusiCo - by Aditya</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
 </head>
@@ -78,7 +78,7 @@
                     div.className = 'folder-item';
                     div.innerText = folderName;
                     
-                    // When a folder is clicked, update the state and reload the track list!
+                    // When a folder is clicked, update the state and reload the track list
                     div.onclick = () => {
                         current_folder = folderName;
                         
@@ -252,7 +252,7 @@
         });
 
         audio.addEventListener('playing', () => {
-            if (current_track_title && document.getElementById('np-title').innerText === "Buffering stream...") {
+            if (current_track_title && document.getElementById('np-title').innerText === "Loading stream...") {
                 document.getElementById('np-title').innerText = current_track_title;
             }
         });
@@ -308,12 +308,12 @@
         Draggable.create(".custom-controls", {
             type: "x, y",
             
-            // --- THE ANDROID FIX ---
-            dragClickables: false, // Ensures buttons can be clicked normally
-            minimumMovement: 10,   // Prevents slight finger wobbles from cancelling the tap
+            // --- THE ANDROID bullshiting fix
+            dragClickables: false, // buttons can be clicked normally
+            minimumMovement: 10,   //now small wobbles dont slide it like crazy.
             // -----------------------
 
-            // When you let go, snap back with a liquid bounce
+            // SHM function lmao
             onRelease: function () {
                 gsap.to(this.target, {
                     x: 0,
@@ -327,14 +327,14 @@
         //PLAYLIST DRAGGABLE (hell yes)
         Draggable.create("#playlist-wrapper", {
             type: "x, y",
-            dragClickables: false, // Lets you click the folders inside it normally
+            dragClickables: false, //can click through it now.
             minimumMovement: 10,   
             //Slower Onrelease fucntion
             onRelease: function () {
                 gsap.to(this.target, {
                     x: 0,
                     y: 0,
-                    duration: 0.5,
+                    duration: 0.9,
                     ease: "elastic.out(1,0.3)"
                 });
             }
