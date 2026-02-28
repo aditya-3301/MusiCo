@@ -241,6 +241,7 @@ body {
     display: flex; 
     flex: 1; 
     overflow: hidden; 
+    z-index:20;
 }
 
 .sidebar { 
@@ -251,6 +252,7 @@ body {
     backdrop-filter: blur(4px); 
     -webkit-backdrop-filter: blur(4px);
     box-sizing: border-box;
+    z-index:20;
 }
 
 .content { 
