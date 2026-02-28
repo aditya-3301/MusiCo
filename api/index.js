@@ -49,8 +49,27 @@ async function get_mega_client() {
     return connection_promise;
 }
 
-app.get('/api/playlist', async (req, res) => {
+// ---ENDPOINT TO GET ALL FOLDERS (playlists not folders lol) 
+app.get('/api/folders', async (req, res) => {
     const { user, pass } = req.query;
+    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Unauthorized');
+
+    try {
+        const storage = await get_mega_client();
+        // Look in the root and filter for items that are directories
+        const folders = storage.root.children
+            .filter(f => f.directory)
+            .map(f => f.name);
+            
+        res.json(folders);
+    } catch (err) {
+        console.error("Folder Fetch Error:", err);
+        res.status(500).send(`Error: ${err.message}`);
+    }
+});
+
+app.get('/api/playlist', async (req, res) => {
+    const { user, pass, folder } = req.query; // <--  Grab the folder parameter
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Wrong login, blowing up...');
 
     try {
@@ -64,13 +83,17 @@ app.get('/api/playlist', async (req, res) => {
             storage = await get_mega_client();
         }
 
-        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
-        if (!main_folder) {
+        // <--  Default to 'main' if no folder is provided, then search for it
+        const target_folder_name = folder || 'main'; 
+        const target_folder = storage.root.children.find(f => f.name === target_folder_name && f.directory);
+        
+        if (!target_folder) {
             mega_storage = null;
-            return res.status(404).send('Main folder not found - session reset, please refresh');
+            return res.status(404).send(`Folder '${target_folder_name}' not found - session reset, please refresh`);
         }
 
-        const songs = main_folder.children
+        // <--  Extract songs from the dynamically found target_folder
+        const songs = target_folder.children
             .filter(f => !f.directory)
             .map(f => f.name.replace('.mp3', '').replace('.m4a', '')); 
             
@@ -79,16 +102,13 @@ app.get('/api/playlist', async (req, res) => {
         console.error("Critical Playlist Error:", err);
         mega_storage = null;
         connection_promise = null;
-        
-        // --- THIS IS THE CRITICAL FIX ---
-        // Instead of a generic message, print the ACTUAL reason to the screen!
         res.status(500).send(`Error 500:Error is -> ${err.message}\n\n[If it says EBLOCKED, i have to change my mega password(Its a very rare error)]`);
     }
 });
 
 // stream logic
 app.get('/stream', async (req, res) => {
-    const { filename, user, pass } = req.query;
+    const { filename, user, pass, folder } = req.query; // <--  Grab folder parameter
     
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
@@ -100,12 +120,13 @@ app.get('/stream', async (req, res) => {
     try {
         // Automatically wake up/connect to MEGA if Vercel went to sleep
         const storage = await get_mega_client();
-        const main_folder = storage.root.children.find(f => f.name === 'main' && f.directory);
-        if (!main_folder) return res.status(404).send('main folder missing');
+        const target_folder_name = folder || 'main';
+        const target_folder = storage.root.children.find(f => f.name === target_folder_name && f.directory);
+        if (!target_folder) return res.status(404).send(`${target_folder_name} folder missing`);
 
         const clean_name = decodeURIComponent(filename);
         // Look for exact match, .mp3, or .m4a
-        const song_file = main_folder.children.find(f => 
+        const song_file = target_folder.children.find(f => 
             f.name === clean_name || 
             f.name === clean_name + '.mp3' ||
             f.name === clean_name + '.m4a'
@@ -113,7 +134,7 @@ app.get('/stream', async (req, res) => {
         
         if (!song_file) return res.status(404).send('song not in mega');
 
-        // --- NEW: Handle Browser Range Requests for Buffering ---
+        // --- Handle Browser Range Requests for Buffering ---
         const size = song_file.size;
         const range = req.headers.range;
 

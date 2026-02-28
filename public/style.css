@@ -41,8 +41,7 @@ body {
     align-items: center; 
     padding: 15px 20px; 
     box-sizing: border-box; 
-    gap: 12px; 
-    z-index: 10; 
+    gap: 12px;  
     position: relative; /* REQUIRED so the background layer stays inside */
 }
 
@@ -240,8 +239,7 @@ body {
 .layout { 
     display: flex; 
     flex: 1; 
-    overflow: hidden; 
-    z-index:20;
+    overflow: hidden;
 }
 
 .sidebar { 
@@ -284,7 +282,7 @@ body {
     width: 100%;
     box-sizing: border-box;
     cursor: grab;
-    z-index: 9999; /* HIGHEST Z-INDEX to float above everything */
+    z-index: 100; /* HIGHEST Z-INDEX to float above everything */
 }
 
 #playlist-wrapper:active {
