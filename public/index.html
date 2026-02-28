@@ -45,7 +45,7 @@
             
         </nav>
         <main class="content">
-            <h1>All Songs in folder: mega/main</h1>
+            <h1>All Songs in mega:</h1>
             <div id="track-list">loading tracks...</div>
         </main>
     </div>
@@ -60,7 +60,12 @@
         let is_shuffle = false; 
         let current_folder = 'main';
 
-        // --- NEW: FETCH FOLDERS FUNCTION ---
+        //  Ts gives a beautiful buffer-less next song play
+        const ghost_player = new Audio();
+        ghost_player.preload = 'auto'; // Tells browser to start fetching data immediately
+        let has_preloaded_next = false;
+
+        //FETCH FOLDERS FUNCTION ---
         async function fetch_folders() {
             const container = document.getElementById('playlist-container');
             if (!container) return; // Safety check just in case
@@ -152,6 +157,7 @@
         }
 
         function play_song(raw_name, title, artist) {
+            has_preloaded_next = false;
             current_track_index = current_playlist.indexOf(raw_name); 
             
             document.getElementById('np-title').innerText = title;
@@ -161,6 +167,30 @@
             // UPDATED: Now includes &folder=... in the stream URL
             player.src = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
             player.play();
+        }
+
+        // Immediately preload next track.
+        function preload_next_track() {
+            if (current_playlist.length < 2) return;
+
+            let next_index = current_track_index;
+            
+            if (is_shuffle) {
+                while (next_index === current_track_index) {
+                    next_index = Math.floor(Math.random() * current_playlist.length);
+                }
+            } else {
+                next_index++;
+                if (next_index >= current_playlist.length) next_index = 0;
+            }
+
+            const raw_name = current_playlist[next_index];
+            const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
+            
+            // Assigning the src and calling load() 
+            // will fetch the first chunk in the background makes it play next song smoothly instantly lol
+            ghost_player.src = next_url;
+            ghost_player.load(); 
         }
 
         function filter_songs() {
@@ -264,6 +294,14 @@
                 current_time_text.innerText = format_time(audio.currentTime);
                 total_time_text.innerText = format_time(audio.duration);
             }
+
+            //When 15 sec remaning, i will preload the next song.
+            const time_remaining = audio.duration - audio.currentTime;
+                if (time_remaining <= 15 && !has_preloaded_next) {
+                    has_preloaded_next = true;
+                    console.log("Preloading next track to ensure smooth transition...");
+                    preload_next_track();
+                }
         });
 
         progress.addEventListener('input', () => {
