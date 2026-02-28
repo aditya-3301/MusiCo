@@ -271,3 +271,93 @@ body {
     margin-left: 20px; /* Gives some breathing room from the draggable buttons */
 }
 
+/*=========================================
+ new commit: PLAYLIST & FOLDER UI*/
+
+#playlist-wrapper {
+    position: relative;
+    margin-top: 20px;
+    padding: 15px 10px;
+    border-radius: 20px;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: grab;
+    z-index: 50; /* High z-index so when you drag it, it floats over the main content */
+}
+
+#playlist-wrapper:active {
+    cursor: grabbing;
+}
+
+/* The Liquid Glass Base for the Wrapper */
+#playlist-wrapper::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    filter: url(#glass-blur-playlist); /* Hooks up to your new SVG filter */
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* The Shiny Glass Rim for the Wrapper */
+#playlist-wrapper::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 1px 1px 3px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* Container for the actual items (scrollable if you have many playlists) */
+#playlist-container {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Custom Scrollbar for the playlist */
+#playlist-container::-webkit-scrollbar { width: 4px; }
+#playlist-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+/* Individual Folder Buttons */
+.folder-item {
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    border: 1px solid transparent;
+}
+
+/* Add a little folder icon before the text */
+.folder-item::before {
+    content: "📁";
+    margin-right: 10px;
+    filter: grayscale(100%) opacity(0.7);
+    transition: 0.2s ease;
+}
+
+.folder-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(4px); /* Slides right slightly when hovered */
+    color: #1db954; /* Spotify green text */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.folder-item:hover::before {
+    filter: grayscale(0%) opacity(1);
+}

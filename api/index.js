@@ -51,7 +51,7 @@ async function get_mega_client() {
 
 app.get('/api/playlist', async (req, res) => {
     const { user, pass } = req.query;
-    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
+    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Wrong login, blowing up...');
 
     try {
         let storage;
@@ -82,7 +82,7 @@ app.get('/api/playlist', async (req, res) => {
         
         // --- THIS IS THE CRITICAL FIX ---
         // Instead of a generic message, print the ACTUAL reason to the screen!
-        res.status(500).send(`Error 500: The real error is -> ${err.message}\n\nIf it says EBLOCKED, i have to change my mega password(Its a very rare error)`);
+        res.status(500).send(`Error 500:Error is -> ${err.message}\n\n[If it says EBLOCKED, i have to change my mega password(Its a very rare error)]`);
     }
 });
 
