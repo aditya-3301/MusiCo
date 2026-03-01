@@ -115,8 +115,7 @@ MEGA Drive/
 
 ---
 
-## Author
-
+##
 Created by Aditya Shankar  
 Thank you so much megajs for creating an unofficial mega api.
 ---
