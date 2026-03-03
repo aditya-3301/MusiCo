@@ -150,11 +150,36 @@ body {
                 inset 0 1px 2px 0 rgba(255, 255, 255, 0.4);
 }
 
-/* --- 3. PROGRESS BAR --- */
-#progress-bar { 
-    flex: 1; 
-    cursor: pointer; 
-    accent-color: #0392ff; 
+#progress-bar {
+    width: 100%;
+    position: relative;
+    z-index: 2; /* Sits on top of the buffer bar */
+    background: transparent; /* VERY IMPORTANT: allows buffer to show through */
+    cursor: pointer;
+    margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 12px;
+}
+
+/* Chrome/Safari Track - make it transparent */
+#progress-bar::-webkit-slider-runnable-track {
+    background: rgba(255, 255, 255, 0.05); /* Very faint guide */
+    height: 4px;
+    border-radius: 2px;
+}
+
+/* The Blue Thumb (Slider Head) */
+#progress-bar::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 12px;
+    width: 12px;
+    border-radius: 50%;
+    background: #0392ff; /* Your accent color */
+    cursor: pointer;
+    margin-top: -4px; /* Re-centers it on the 4px track */
+    box-shadow: 0 0 10px rgba(3, 146, 255, 0.6);
+    border: 2px solid white;
 }
 #current-time, #total-time { font-size: 12px; color: #9ca3af; min-width: 35px; text-align: center; }
 
@@ -263,12 +288,36 @@ body {
     box-sizing: border-box;
 }
 
-/* --- PROGRESS BAR LAYOUT --- */
+/* Container for the Progress/Buffer Wrapper */
 .progress-container {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-left: 20px; /* Gives some breathing room from the draggable buttons */
+    flex: 1; 
+    width: 100%;
+    max-width: 600px; /* Optional: keeps it from stretching too far */
+}
+
+/* The Wrapper: This is the magic part that stacks the two bars */
+.progress-wrapper {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    height: 12px; /* Height of the hit area */
+}
+
+/* The Buffer Bar Styling */
+#buffer-bar {
+    position: absolute;
+    left: 0;
+    height: 4px; /* Matches your track height */
+    background: rgba(255, 255, 255, 0.15); /* Glassy white */
+    border-radius: 2px;
+    pointer-events: none;
+    width: 0%; /* Managed by JS */
+    transition: width 0.4s ease; /* Smoother chunk loading */
+    z-index: 1;
 }
 
 /* ==============================================-----------------------------------------------

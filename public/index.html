@@ -18,10 +18,12 @@
             <button id="next-btn" class="glass-tint-muted">⏭</button>
         </div>
         
-        <div class="progress-container" style="position: relative;">
+        <div class="progress-container">
             <span id="current-time">0:00</span>
-            <div id="buffer-bar" style="position: absolute; left: 50px; right: 50px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; pointer-events: none; width: 0%;"></div>
-            <input type="range" id="progress-bar" value="0" max="100" style="position: relative; z-index: 2;">
+            <div class="progress-wrapper">
+                <div id="buffer-bar"></div>
+                <input type="range" id="progress-bar" value="0" max="100">
+            </div>
             <span id="total-time">0:00</span>
         </div>
 
@@ -328,7 +330,7 @@
                     if (audio.buffered.start(audio.buffered.length - 1 - i) < audio.currentTime) {
                         const buffered_end = audio.buffered.end(audio.buffered.length - 1 - i);
                         const width = (buffered_end / audio.duration) * 100;
-                        buffer_bar.style.width = `calc(${width}% - 100px)`; // Adjusted for the 50px side spans
+                        buffer_bar.style.width = width + "%"; 
                         break;
                     }
                 }
