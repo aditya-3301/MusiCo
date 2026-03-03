@@ -165,19 +165,28 @@
             
             document.getElementById('np-title').innerText = title;
             document.getElementById('np-artist').innerText = artist;
+            
             const player = document.getElementById('audio-player');
+            const progress_bar = document.getElementById('progress-bar');
+            const play_btn = document.getElementById('play-btn');
+
+            // FIX 1: Reset the bar to 0 immediately so it doesn't stay at the old position
+            progress_bar.value = 0;
             
             const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
 
-            
             if (ghost_player.src === window.location.origin + new_url) {
                 console.log("Seamless hand-off from ghost player!");
                 player.src = ghost_player.src;
             } else {
                 player.src = new_url;
             }
-            
-            player.play();
+
+            // FIX 2: Force the audio to play immediately
+            player.play().then(() => {
+                // FIX 3: Update the UI button to show the Pause icon
+                play_btn.innerText = "⏸";
+            }).catch(e => console.error("Playback failed:", e));
         }
 
         // Immediately preload next track.
