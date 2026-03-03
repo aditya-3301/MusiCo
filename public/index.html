@@ -295,9 +295,9 @@
                 total_time_text.innerText = format_time(audio.duration);
             }
 
-            //When 15 sec remaning, i will preload the next song.
+            //When 200 sec remaning, i will preload the next song.
             const time_remaining = audio.duration - audio.currentTime;
-                if (time_remaining <= 30 && !has_preloaded_next) {
+                if (time_remaining <= 200 && !has_preloaded_next) {
                     has_preloaded_next = true;
                     console.log("Preloading next track to ensure smooth transition...");
                     preload_next_track();
