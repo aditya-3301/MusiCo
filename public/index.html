@@ -18,9 +18,10 @@
             <button id="next-btn" class="glass-tint-muted">⏭</button>
         </div>
         
-        <div class="progress-container">
+        <div class="progress-container" style="position: relative;">
             <span id="current-time">0:00</span>
-            <input type="range" id="progress-bar" value="0" max="100">
+            <div id="buffer-bar" style="position: absolute; left: 50px; right: 50px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; pointer-events: none; width: 0%;"></div>
+            <input type="range" id="progress-bar" value="0" max="100" style="position: relative; z-index: 2;">
             <span id="total-time">0:00</span>
         </div>
 
@@ -62,7 +63,7 @@
 
         //  Ts gives a beautiful buffer-less next song play
         const ghost_player = new Audio();
-        ghost_player.preload = 'auto'; // Tells browser to start fetching data immediately
+        ghost_player.preload = 'auto'; 
         let has_preloaded_next = false;
 
         //FETCH FOLDERS FUNCTION ---
@@ -77,7 +78,7 @@
                 if (!res.ok) throw new Error("Failed to fetch folders");
                 
                 const folders = await res.json();
-                container.innerHTML = ''; // Clear the "Loading..." text
+                container.innerHTML = '';
 
                 folders.forEach(folderName => {
                     const div = document.createElement('div');
@@ -106,7 +107,7 @@
             }
         }
 
-        // --- Toggle shuffle state and update button colors ---
+        
         function toggle_shuffle() {
             is_shuffle = !is_shuffle;
             const btn = document.getElementById('shuffle-btn');
@@ -121,7 +122,7 @@
                 btn.classList.add('glass-tint-muted');
             }
         }
-        
+
         async function load_tracks() {
             // UPDATED: Now includes &folder=... in the request
             const res = await fetch(`/api/playlist?user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`);
@@ -164,13 +165,27 @@
             document.getElementById('np-artist').innerText = artist;
             const player = document.getElementById('audio-player');
             
-            // UPDATED: Now includes &folder=... in the stream URL
-            player.src = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
+            const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
+
+            
+            if (ghost_player.src === window.location.origin + new_url) {
+                console.log("Seamless hand-off from ghost player!");
+                player.src = ghost_player.src;
+            } else {
+                player.src = new_url;
+            }
+            
             player.play();
         }
 
         // Immediately preload next track.
         function preload_next_track() {
+            ghost_player.addEventListener('progress', () => {
+                if (ghost_player.buffered.length > 0) {
+                    const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
+                    console.log(`Next song preloading: ~${loaded}MB cached in background.`);
+                }
+            }, { once: false }); // Keep tracking as the chunk arrives
             if (current_playlist.length < 2) return;
 
             let next_index = current_track_index;
@@ -297,13 +312,28 @@
 
             //When 200 sec remaning, i will preload the next song.
             const time_remaining = audio.duration - audio.currentTime;
-                if (time_remaining <= 200 && !has_preloaded_next) {
+                if (time_remaining <= 30 && !has_preloaded_next) {
                     has_preloaded_next = true;
                     console.log("Preloading next track to ensure smooth transition...");
                     preload_next_track();
                 }
         });
+        
+        const buffer_bar = document.getElementById('buffer-bar');
 
+        audio.addEventListener('progress', () => {
+            if (audio.duration > 0) {
+                for (let i = 0; i < audio.buffered.length; i++) {
+                    // Find the buffer range that contains the current play time
+                    if (audio.buffered.start(audio.buffered.length - 1 - i) < audio.currentTime) {
+                        const buffered_end = audio.buffered.end(audio.buffered.length - 1 - i);
+                        const width = (buffered_end / audio.duration) * 100;
+                        buffer_bar.style.width = `calc(${width}% - 100px)`; // Adjusted for the 50px side spans
+                        break;
+                    }
+                }
+            }
+        });
         progress.addEventListener('input', () => {
             audio.currentTime = (progress.value / 100) * audio.duration;
         });
