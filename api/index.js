@@ -51,9 +51,6 @@ async function get_mega_client() {
 
 // returns all folders (aka playlists) from MEGA root
 app.get('/api/folders', async (req, res) => {
-    const { user, pass } = req.query;
-    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Unauthorized');
-
     try {
         const storage = await get_mega_client();
         const folders = storage.root.children
@@ -68,8 +65,7 @@ app.get('/api/folders', async (req, res) => {
 });
 
 app.get('/api/playlist', async (req, res) => {
-    const { user, pass, folder } = req.query;
-    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Wrong login, blowing up...');
+    const { folder } = req.query;
 
     try {
         let storage;
