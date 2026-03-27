@@ -13,6 +13,7 @@
         
         <div class="custom-controls">
             <button id="shuffle-btn" class="glass-tint-muted" onclick="toggle_shuffle()">🔀</button>
+            <button id="loop-btn" class="glass-tint-muted" onclick="toggle_loop()">🔁</button>
             <button id="prev-btn">⏮</button>
             <button id="play-btn" class="glass-tint-black" onclick="toggle_play()">▶</button>
             <button id="next-btn" class="glass-tint-muted">⏭</button>
@@ -62,6 +63,7 @@
         let current_track_index = -1;
         let is_shuffle = false; 
         let current_folder = 'main';
+        let play_next_queue = [];
 
         // hidden audio element that silently buffers the next song
         const ghost_player = new Audio();
@@ -122,6 +124,19 @@
                 btn.classList.add('glass-tint-muted');
             }
         }
+        function toggle_loop() {
+            const btn = document.getElementById('loop-btn');
+            audio.loop = !audio.loop;
+            if (audio.loop) {
+                btn.classList.remove('glass-tint-muted');
+                btn.style.backgroundColor = 'white';
+                btn.style.color = 'black';
+            } else {
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+                btn.classList.add('glass-tint-muted');
+            }
+        }
 
         async function load_tracks() {
             const res = await fetch(`/api/playlist?user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`);
@@ -152,6 +167,19 @@
                 div.className = 'track-item';
                 div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
                 div.onclick = () => play_song(raw_item, title, artist);
+
+const queue_btn = document.createElement('button');
+queue_btn.className = 'queue-btn';
+queue_btn.innerText = '⏭';
+            queue_btn.title = 'Play next';
+            queue_btn.onclick = (e) => {
+                e.stopPropagation();
+                play_next_queue.unshift(raw_item);
+                queue_btn.innerText = '✓';
+                setTimeout(() => queue_btn.innerText = '⏭', 1000);
+            };
+            div.appendChild(queue_btn);
+            container.appendChild(div);
                 container.appendChild(div);
             });
         }
@@ -228,6 +256,12 @@
         function play_next() {
             if (current_playlist.length === 0) return;
             
+            if (play_next_queue.length > 0) {
+                const next_raw = play_next_queue.shift();
+                const idx = current_playlist.indexOf(next_raw);
+                if (idx !== -1) { current_track_index = idx; load_track_from_index(idx); return; }
+            }
+
             if (is_shuffle && current_playlist.length > 1) {
                 let random_index = current_track_index;
                 while (random_index === current_track_index) {

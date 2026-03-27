@@ -127,18 +127,21 @@ app.get('/stream', async (req, res) => {
 
         const size = song_file.size;
         const range = req.headers.range;
+        const content_type = song_file.name.endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg';
 
         if (range) {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : size - 1;
+            const MIN_CHUNK = 512 * 1024; // 512KB min, reduces round trips
+            const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + MIN_CHUNK, size - 1);
             const chunksize = (end - start) + 1;
 
             res.writeHead(206, {
                 'Content-Range': `bytes ${start}-${end}/${size}`,
                 'Accept-Ranges': 'bytes',
                 'Content-Length': chunksize,
-                'Content-Type': 'audio/mpeg',
+                'Content-Type': content_type,
+                'Cache-Control': 'private, max-age=3600',
             });
             
             const download_stream = song_file.download({ start, end });
@@ -146,7 +149,8 @@ app.get('/stream', async (req, res) => {
         } else {
             res.writeHead(200, {
                 'Content-Length': size,
-                'Content-Type': 'audio/mpeg',
+                'Content-Type': content_type,
+                'Cache-Control': 'private, max-age=3600',
             });
             const download_stream = song_file.download();
             download_stream.pipe(res);
