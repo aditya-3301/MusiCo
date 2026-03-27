@@ -1,17 +1,17 @@
 require('dotenv').config();
 const express = require('express');
 const { Storage } = require('megajs');
+const path = require('path');
 
 const app = express();
-const port = process.env.port || 3000;
+const port = process.env.PORT || 3000;
 
-// auth stuff for vercel
+// credentials from .env
 const user_auth = process.env.admin_user; 
 const pass_auth = process.env.admin_pass;
 
-app.use(express.static('..'));
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// --- GLOBAL CONNECTION HELPERS ---
 let mega_storage = null;
 let connection_promise = null;
 
@@ -22,10 +22,9 @@ async function get_mega_client() {
     console.log("Waking up server...");
     
     connection_promise = new Promise(async (resolve, reject) => {
-        // --- THE KILL SWITCH ---
-        // If MEGA doesn't respond in 10 seconds, fail the promise
+        // bail out if MEGA hangs for 10s
         const timeout = setTimeout(() => {
-            connection_promise = null; // Clear the hang
+            connection_promise = null;
             reject(new Error("MEGA_HANG: Connection timed out. Refresh now."));
         }, 10000);
 
@@ -36,12 +35,13 @@ async function get_mega_client() {
                 autologin: true
             }).ready;
             
-            clearTimeout(timeout); // Success! Stop the timer
+            clearTimeout(timeout);
             mega_storage = storage;
+            connection_promise = null;
             resolve(mega_storage);
         } catch (e) {
             clearTimeout(timeout);
-            connection_promise = null; // Error! Clear for retry
+            connection_promise = null;
             reject(e);
         }
     });
@@ -49,14 +49,13 @@ async function get_mega_client() {
     return connection_promise;
 }
 
-// ---ENDPOINT TO GET ALL FOLDERS (playlists not folders lol) 
+// returns all folders (aka playlists) from MEGA root
 app.get('/api/folders', async (req, res) => {
     const { user, pass } = req.query;
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Unauthorized');
 
     try {
         const storage = await get_mega_client();
-        // Look in the root and filter for items that are directories
         const folders = storage.root.children
             .filter(f => f.directory)
             .map(f => f.name);
@@ -69,7 +68,7 @@ app.get('/api/folders', async (req, res) => {
 });
 
 app.get('/api/playlist', async (req, res) => {
-    const { user, pass, folder } = req.query; // <--  Grab the folder parameter
+    const { user, pass, folder } = req.query;
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('Wrong login, blowing up...');
 
     try {
@@ -83,7 +82,6 @@ app.get('/api/playlist', async (req, res) => {
             storage = await get_mega_client();
         }
 
-        // <--  Default to 'main' if no folder is provided, then search for it
         const target_folder_name = folder || 'main'; 
         const target_folder = storage.root.children.find(f => f.name === target_folder_name && f.directory);
         
@@ -92,7 +90,6 @@ app.get('/api/playlist', async (req, res) => {
             return res.status(404).send(`Folder '${target_folder_name}' not found - session reset, please refresh`);
         }
 
-        // <--  Extract songs from the dynamically found target_folder
         const songs = target_folder.children
             .filter(f => !f.directory)
             .map(f => f.name.replace('.mp3', '').replace('.m4a', '')); 
@@ -106,26 +103,20 @@ app.get('/api/playlist', async (req, res) => {
     }
 });
 
-// stream logic
+// streams audio, handles range requests for seeking
 app.get('/stream', async (req, res) => {
-    const { filename, user, pass, folder } = req.query; // <--  Grab folder parameter
+    const { filename, user, pass, folder } = req.query;
     
     if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
 
-    // Prevent crashing if MEGA hasn't finished logging in yet
-    if (!mega_storage || !mega_storage.root) {
-        return res.status(503).send('MEGA is still connecting, try again in a few seconds');
-    }
-
     try {
-        // Automatically wake up/connect to MEGA if Vercel went to sleep
         const storage = await get_mega_client();
         const target_folder_name = folder || 'main';
         const target_folder = storage.root.children.find(f => f.name === target_folder_name && f.directory);
         if (!target_folder) return res.status(404).send(`${target_folder_name} folder missing`);
 
         const clean_name = decodeURIComponent(filename);
-        // Look for exact match, .mp3, or .m4a
+        // match with or without extension
         const song_file = target_folder.children.find(f => 
             f.name === clean_name || 
             f.name === clean_name + '.mp3' ||
@@ -134,7 +125,6 @@ app.get('/stream', async (req, res) => {
         
         if (!song_file) return res.status(404).send('song not in mega');
 
-        // --- Handle Browser Range Requests for Buffering ---
         const size = song_file.size;
         const range = req.headers.range;
 
@@ -169,3 +159,8 @@ app.get('/stream', async (req, res) => {
 });
 
 module.exports = app;
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`MusiCo running at http://localhost:${port}`);
+    });
+}

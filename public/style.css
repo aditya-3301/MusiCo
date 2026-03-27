@@ -1,18 +1,19 @@
-/* --- GLASS VARIABLES --- */
+/* glass variables */
 :root {
-    --bg-tint: transparent; /* Default is transparent */
+    --bg-tint: transparent;
     --glass-bg: color-mix(in oklab, var(--bg-tint) 80%, transparent);
     --glass-border: color-mix(in oklab, var(--glass-bg) 70%, white);
 }
 
-/* To make buttons "Black Tinted", you can add this class to them in HTML */
+/* add to buttons for black or muted tint */
 .glass-tint-black { --bg-tint: black; }
 .glass-tint-muted { --bg-tint: rgba(255, 255, 255, 0.1); }
-/* --- BASE LAYOUT --- */
+
+/* --- BASE --- */
 body { 
     margin: 0; 
     font-family: sans-serif; 
-    background: transparent; /* <- Removed the solid color */
+    background: transparent;
     color: #fff; 
     display: flex; 
     flex-direction: column; 
@@ -20,7 +21,7 @@ body {
     overflow: hidden; 
 }
 
-/* This creates a background wall specifically for the dots */
+/* particle canvas sits behind everything */
 #particles-js {
     position: fixed !important;
     top: 0;
@@ -31,7 +32,8 @@ body {
     z-index: -10 !important;
     pointer-events: none;
 }
-/* --- TOP HEADER PLAYER --- */
+
+/* --- PLAYER BAR --- */
 .player-bar { 
     width: 100%; 
     min-height: 125px;  
@@ -42,10 +44,10 @@ body {
     padding: 15px 20px; 
     box-sizing: border-box; 
     gap: 12px;  
-    position: relative; /* REQUIRED so the background layer stays inside */
+    position: relative;
 }
 
-/* This background layer puts the blur BEHIND your liquid pill */
+/* frosted backdrop behind the controls pill */
 .player-bar::before {
     content: "";
     position: absolute;
@@ -54,10 +56,10 @@ body {
     backdrop-filter: blur(5px); 
     -webkit-backdrop-filter: blur(5px);
     z-index: -1;
-    pointer-events: none; /* Ensures you can still click the player! */
+    pointer-events: none;
 }
 
-/* --- 1. THE LIQUID TRAY CONTAINER --- */
+/* --- CONTROLS PILL --- */
 .custom-controls { 
     position: relative; 
     display: flex; 
@@ -70,8 +72,6 @@ body {
     border-radius: 20px;
     box-sizing: border-box;
     cursor: grab; 
-    
-    /* Softened shadow so it doesn't darken the background */
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
     z-index: 10;
 }
@@ -80,15 +80,13 @@ body {
     cursor: grabbing;
 }
 
-/* 🟢 LAYER 1: The Water Base (Ultra Transparent) */
-/* 🟢 LAYER 1: The Glass Base (Ultra Transparent, less blur) */
+/* layer 1 — glass base */
 .custom-controls::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: rgba(255, 255, 255, 0.01);
-    /* Lowered blur from 4px to 2px for a sharper look */
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
     filter: url(#glass-blur-player);
@@ -96,13 +94,12 @@ body {
     pointer-events: none;
 }
 
-/* 🟢 LAYER 2: The Shiny Rim (Softer reflections) */
+/* layer 2 — shiny rim */
 .custom-controls::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    /* Softened white edges */
     box-shadow: inset 2px 2px 3px 0 rgba(255, 255, 255, 0.08),
                 inset -2px -2px 3px 0 rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.02);
@@ -111,33 +108,25 @@ body {
     pointer-events: none;
 }
 
-/* Keep the buttons and progress bar ABOVE the liquid background */
+/* keeps buttons above the glass layers */
 .custom-controls > * {
     position: relative;
     z-index: 1;
 }
 
-/* --- 2. THE LIQUID BUTTONS --- */
+/* --- BUTTONS --- */
 .custom-controls button { 
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    
-    /* Shape & Spacing */
     padding: 10px 20px;
     border-radius: 24px; 
-    
-    /* Text & Font */
     color: white; 
     font-weight: 600;
     cursor: pointer; 
-    
-    /* 🟢 FIX: Combined your two box-shadows with a comma so the inset works! */
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2), 
                 inset 0 1px 1px 0 rgba(255, 255, 255, 0.2); 
-    
-    /* Animation */
     transition: all 0.3s ease;
 }
 
@@ -145,16 +134,16 @@ body {
     transform: scale(1.1); 
     color: #1db954; 
     border-color: rgba(255, 255, 255, 0.4);
-    /* Enhances the liquid glow when hovered */
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3), 
                 inset 0 1px 2px 0 rgba(255, 255, 255, 0.4);
 }
 
+/* --- PROGRESS BAR --- */
 #progress-bar {
     width: 100%;
     position: relative;
-    z-index: 2; /* Sits on top of the buffer bar */
-    background: transparent; /* VERY IMPORTANT: allows buffer to show through */
+    z-index: 2;
+    background: transparent; /* must stay transparent so buffer bar shows through */
     cursor: pointer;
     margin: 0;
     -webkit-appearance: none;
@@ -162,28 +151,27 @@ body {
     height: 12px;
 }
 
-/* Chrome/Safari Track - make it transparent */
 #progress-bar::-webkit-slider-runnable-track {
-    background: rgba(255, 255, 255, 0.05); /* Very faint guide */
+    background: rgba(255, 255, 255, 0.05);
     height: 4px;
     border-radius: 2px;
 }
 
-/* The Blue Thumb (Slider Head) */
 #progress-bar::-webkit-slider-thumb {
     -webkit-appearance: none;
     height: 12px;
     width: 12px;
     border-radius: 50%;
-    background: #0392ff; /* Your accent color */
+    background: #0392ff;
     cursor: pointer;
-    margin-top: -4px; /* Re-centers it on the 4px track */
+    margin-top: -4px;
     box-shadow: 0 0 10px rgba(3, 146, 255, 0.6);
     border: 2px solid white;
 }
+
 #current-time, #total-time { font-size: 12px; color: #9ca3af; min-width: 35px; text-align: center; }
 
-/* --- NOW PLAYING TEXT --- */
+/* --- NOW PLAYING --- */
 #now-playing { 
     text-align: center; 
     width: 100%; 
@@ -197,7 +185,7 @@ body {
 
 /* --- TRACK LIST --- */
 .track-item { 
-    position: relative; /* Required for the liquid background to attach properly */
+    position: relative;
     display: flex; 
     flex-direction: column; 
     padding: 14px 18px; 
@@ -206,11 +194,11 @@ body {
     border: 1px solid transparent;
     cursor: pointer; 
     transition: 0.2s ease;
-    z-index: 1; /* Creates a stacking context so text stays on top */
-    overflow: hidden; /* Prevents the liquid effect from bleeding outside the rounded corners */
+    z-index: 1;
+    overflow: hidden;
 }
 
-/* 💧 NEW: The Liquid Glass Refraction Layer for Songs */
+/* glass refraction layer per track */
 .track-item::before {
     content: "";
     position: absolute;
@@ -219,9 +207,8 @@ body {
     background: rgba(255, 255, 255, 0.02);
     backdrop-filter: blur(2px);
     -webkit-backdrop-filter: blur(2px);
-    /* Inside .track-item::before */
     filter: url(#glass-blur-track);
-    z-index: -2; /* Puts the liquid behind the track text */
+    z-index: -2;
     pointer-events: none;
     transition: background 0.2s ease;
 }
@@ -232,13 +219,13 @@ body {
 }
 
 .track-item:hover::before { 
-    background: rgba(255, 255, 255, 0.06); /* Brightens the liquid on hover */
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .track-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
 .track-artist { color: #9ca3af; font-size: 13px; }
 
-/* --- SEARCH BAR --- */
+/* --- SEARCH --- */
 #search-box { 
     width: 100%; 
     padding: 12px 15px; 
@@ -260,7 +247,8 @@ body {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 #search-box::placeholder { color: #9ca3af; }
-/* --- MAIN LAYOUT (SIDEBAR & CONTENT) --- */
+
+/* --- LAYOUT --- */
 .layout { 
     display: flex; 
     flex: 1; 
@@ -269,7 +257,7 @@ body {
 
 .sidebar { 
     width: 220px; 
-    background: rgba(17, 24, 39, 0.288); /* See-through for dots */
+    background: rgba(17, 24, 39, 0.288);
     padding: 20px; 
     border-right: 1px solid rgba(255, 255, 255, 0.05); 
     backdrop-filter: blur(4px); 
@@ -282,47 +270,43 @@ body {
     flex: 1; 
     padding: 20px; 
     overflow-y: auto; 
-    /* See-through gradient for dots */
     background: linear-gradient(to bottom, rgba(31, 41, 55, 0.2), rgba(11, 15, 25, 0.6)); 
     padding-bottom: 100px; 
     box-sizing: border-box;
 }
 
-/* Container for the Progress/Buffer Wrapper */
+/* --- PROGRESS / BUFFER --- */
 .progress-container {
     display: flex;
     align-items: center;
     gap: 10px;
     flex: 1; 
     width: 100%;
-    max-width: 600px; /* Optional: keeps it from stretching too far */
+    max-width: 600px;
 }
 
-/* The Wrapper: This is the magic part that stacks the two bars */
+/* stacks progress bar on top of buffer bar */
 .progress-wrapper {
     position: relative;
     flex: 1;
     display: flex;
     align-items: center;
-    height: 12px; /* Height of the hit area */
+    height: 12px;
 }
 
-/* The Buffer Bar Styling */
 #buffer-bar {
     position: absolute;
     left: 0;
-    height: 4px; /* Matches your track height */
-    background: rgba(255, 255, 255, 0.15); /* Glassy white */
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
     border-radius: 2px;
     pointer-events: none;
-    width: 0%; /* Managed by JS */
-    transition: width 0.4s ease; /* Smoother chunk loading */
+    width: 0%;
+    transition: width 0.4s ease;
     z-index: 1;
 }
 
-/* ==============================================-----------------------------------------------
-   NEW: PLAYLIST & FOLDER UI*/
-
+/* --- PLAYLIST SIDEBAR --- */
 #playlist-wrapper {
     position: relative;
     margin-top: 20px;
@@ -331,14 +315,14 @@ body {
     width: 100%;
     box-sizing: border-box;
     cursor: grab;
-    z-index: 100; /* HIGHEST Z-INDEX to float above everything */
+    z-index: 100;
 }
 
 #playlist-wrapper:active {
     cursor: grabbing;
 }
 
-/* The Liquid Glass Base for the Wrapper */
+/* glass base */
 #playlist-wrapper::before {
     content: "";
     position: absolute;
@@ -347,12 +331,12 @@ body {
     background: rgba(255, 255, 255, 0.02);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
-    filter: url(#glass-blur-playlist); /* Hooks up to your new SVG filter */
+    filter: url(#glass-blur-playlist);
     z-index: -2;
     pointer-events: none;
 }
 
-/* The Shiny Glass Rim for the Wrapper */
+/* shiny rim */
 #playlist-wrapper::after {
     content: "";
     position: absolute;
@@ -364,18 +348,16 @@ body {
     pointer-events: none;
 }
 
-/* Container for the actual items */
 #playlist-container {
     max-height: 300px;
     overflow-y: auto;
     padding-right: 5px;
 }
 
-/* Custom Scrollbar */
 #playlist-container::-webkit-scrollbar { width: 4px; }
 #playlist-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
-/* Individual Folder Buttons */
+/* --- FOLDER ITEMS --- */
 .folder-item {
     padding: 12px 15px;
     margin-bottom: 8px;
@@ -391,7 +373,6 @@ body {
     border: 1px solid transparent;
 }
 
-/* Folder Icon */
 .folder-item::before {
     content: "📁";
     margin-right: 10px;

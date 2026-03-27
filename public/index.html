@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-<link rel="stylesheet" href="style.css">
 <head>
     <title>MusiCo - by Aditya</title>
+    <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
 </head>
@@ -63,15 +63,14 @@
         let is_shuffle = false; 
         let current_folder = 'main';
 
-        //  Ts gives a beautiful buffer-less next song play
+        // hidden audio element that silently buffers the next song
         const ghost_player = new Audio();
         ghost_player.preload = 'auto'; 
         let has_preloaded_next = false;
 
-        //FETCH FOLDERS FUNCTION ---
         async function fetch_folders() {
             const container = document.getElementById('playlist-container');
-            if (!container) return; // Safety check just in case
+            if (!container) return;
 
             container.innerHTML = '<div style="padding: 10px; font-size: 13px; color: #9ca3af;">Loading folders...</div>';
 
@@ -87,18 +86,17 @@
                     div.className = 'folder-item';
                     div.innerText = folderName;
                     
-                    // When a folder is clicked, update the state and reload the track list
                     div.onclick = () => {
                         current_folder = folderName;
                         
-                        // Optional: Clear search box if you have one
+                        // clear search on folder switch
                         const searchBox = document.getElementById('search-box');
                         if(searchBox) {
                             searchBox.value = ''; 
                             filter_songs();
                         }
                         
-                        load_tracks(); // Fetch the new folder's songs
+                        load_tracks();
                     };
                     
                     container.appendChild(div);
@@ -126,7 +124,6 @@
         }
 
         async function load_tracks() {
-            // UPDATED: Now includes &folder=... in the request
             const res = await fetch(`/api/playlist?user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`);
             if (!res.ok) {
                 const error_msg = await res.text();
@@ -170,7 +167,7 @@
             const progress_bar = document.getElementById('progress-bar');
             const play_btn = document.getElementById('play-btn');
 
-            // FIX 1: Reset the bar to 0 immediately so it doesn't stay at the old position
+            // reset bar so it doesn't stay at old position
             progress_bar.value = 0;
             
             const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
@@ -182,21 +179,14 @@
                 player.src = new_url;
             }
 
-            // FIX 2: Force the audio to play immediately
             player.play().then(() => {
-                // FIX 3: Update the UI button to show the Pause icon
                 play_btn.innerText = "⏸";
             }).catch(e => console.error("Playback failed:", e));
         }
 
-        // Immediately preload next track.
+        // fetches first chunk of next song in background for gapless playback
         function preload_next_track() {
-            ghost_player.addEventListener('progress', () => {
-                if (ghost_player.buffered.length > 0) {
-                    const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
-                    console.log(`Next song preloading: ~${loaded}MB cached in background.`);
-                }
-            }, { once: false }); // Keep tracking as the chunk arrives
+            
             if (current_playlist.length < 2) return;
 
             let next_index = current_track_index;
@@ -213,8 +203,6 @@
             const raw_name = current_playlist[next_index];
             const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${user}&pass=${pass}&folder=${encodeURIComponent(current_folder)}`;
             
-            // Assigning the src and calling load() 
-            // will fetch the first chunk in the background makes it play next song smoothly instantly lol
             ghost_player.src = next_url;
             ghost_player.load(); 
         }
@@ -288,6 +276,13 @@
         audio.addEventListener('play', () => play_btn.innerText = '⏸');
         audio.addEventListener('pause', () => play_btn.innerText = '▶');
 
+        ghost_player.addEventListener('progress', () => {
+            if (ghost_player.buffered.length > 0) {
+                const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
+                console.log(`Next song preloading: ~${loaded}MB cached in background.`);
+            }
+        });
+
         audio.addEventListener('error', () => {
             console.error("Playback error: File corrupted or MEGA stream failed.");
             
@@ -321,7 +316,7 @@
                 total_time_text.innerText = format_time(audio.duration);
             }
 
-            //When 200 sec remaning, i will preload the next song.
+            // preload next song at 30s remaining
             const time_remaining = audio.duration - audio.currentTime;
                 if (time_remaining <= 30 && !has_preloaded_next) {
                     has_preloaded_next = true;
@@ -335,7 +330,7 @@
         audio.addEventListener('progress', () => {
             if (audio.duration > 0) {
                 for (let i = 0; i < audio.buffered.length; i++) {
-                    // Find the buffer range that contains the current play time
+                    // find the buffer range covering current playhead
                     if (audio.buffered.start(audio.buffered.length - 1 - i) < audio.currentTime) {
                         const buffered_end = audio.buffered.end(audio.buffered.length - 1 - i);
                         const width = (buffered_end / audio.duration) * 100;
@@ -345,6 +340,7 @@
                 }
             }
         });
+
         progress.addEventListener('input', () => {
             audio.currentTime = (progress.value / 100) * audio.duration;
         });
@@ -355,14 +351,13 @@
             return `${min}:${sec < 10 ? '0' : ''}${sec}`;
         }
 
-        // --- STARTUP EXECUTIONS ---
-        fetch_folders(); // Fetch and render folders
-        load_tracks();   // Fetch and render initial main tracks
+        // startup
+        fetch_folders();
+        load_tracks();
 </script>
 
     <script src="particles.js"></script>
     <script>
-        // This fires up the local file you just created
         particlesJS("particles-js", {
             "particles": {
                 "number": { "value": 80 },
@@ -379,21 +374,14 @@
                 }
             }
         });
-        // --- LIQUID GLASS DRAGGABLE ---
+
         gsap.registerPlugin(Draggable);
 
-        // --- LIQUID GLASS DRAGGABLE ---
-        gsap.registerPlugin(Draggable);
-
+        // player controls — snaps back on release
         Draggable.create(".custom-controls", {
             type: "x, y",
-            
-            // --- THE ANDROID bullshiting fix
-            dragClickables: false, // buttons can be clicked normally
-            minimumMovement: 10,   //now small wobbles dont slide it like crazy.
-            // -----------------------
-
-            // SHM function lmao
+            dragClickables: false,
+            minimumMovement: 10,
             onRelease: function () {
                 gsap.to(this.target, {
                     x: 0,
@@ -404,12 +392,11 @@
             }
         });
 
-        //PLAYLIST DRAGGABLE (hell yes)
+        // playlist sidebar — snaps back slower
         Draggable.create("#playlist-wrapper", {
             type: "x, y",
-            dragClickables: false, //can click through it now.
-            minimumMovement: 10,   
-            //Slower Onrelease fucntion
+            dragClickables: false,
+            minimumMovement: 10,
             onRelease: function () {
                 gsap.to(this.target, {
                     x: 0,
