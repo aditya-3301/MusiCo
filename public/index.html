@@ -2,24 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- Disable user zoom on mobile — the UI is fixed-layout and zoom breaks the player bar. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- iOS home-screen / PWA chrome settings -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0b0f19">
     <title>MusiCo - by Aditya</title>
     <link rel="stylesheet" href="style.css">
+    <!-- GSAP core + Draggable plugin — used for the elastic snap-back on the controls pill. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
 </head>
 <body>
+    <!-- particles.js renders its canvas into this div. z-index keeps it behind everything. -->
     <div id="particles-js"></div>
 
-    <!-- Mobile hamburger -->
     <button id="hamburger-btn" onclick="toggle_sidebar()" aria-label="Toggle playlist sidebar">
         <span></span><span></span><span></span>
     </button>
 
-    <!-- Sidebar overlay for mobile -->
+    <!-- Darkens the rest of the screen when the sidebar is open on mobile. -->
     <div id="sidebar-overlay" onclick="close_sidebar()"></div>
 
     <button id="auth-btn" onclick="enter_credentials()">🔒 Enter password to stream</button>
@@ -37,6 +40,7 @@
         <div class="progress-container">
             <span id="current-time">0:00</span>
             <div class="progress-wrapper">
+                <!-- buffer-bar sits behind the range thumb and shows how much is cached. -->
                 <div id="buffer-bar"></div>
                 <input type="range" id="progress-bar" value="0" max="100">
             </div>
@@ -47,6 +51,7 @@
             <div id="np-title">Waiting for login...</div>
             <div id="np-artist"></div>
         </div>
+        <!-- playsinline stops iOS from going full-screen when playback starts. -->
         <audio id="audio-player" playsinline></audio>
     </div>
 
@@ -73,6 +78,7 @@
     
     <script>
 
+        // Credentials are stored in memory only — never written to localStorage or the DOM.
         let stream_user = "";
         let stream_pass = "";
         let current_playlist = [];
@@ -90,13 +96,16 @@
         let current_track_index = -1;
         let is_shuffle = false; 
         let current_folder = 'main';
-        let play_next_queue = [];
+        let play_next_queue = [];   // tracks queued with the ⏭ "play next" button
 
+        // ghost_player silently preloads the upcoming track while the current one plays,
+        // so switching songs feels instant without any buffering gap.
         const ghost_player = new Audio();
         ghost_player.preload = 'auto'; 
         let has_preloaded_next = false;
 
         // ── SIDEBAR MOBILE TOGGLE ──────────────────────────────────────────
+
         function toggle_sidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebar-overlay');
@@ -112,6 +121,7 @@
         }
 
         // ── FOLDERS ──────────────────────────────────────────────────────
+
         async function fetch_folders() {
             const container = document.getElementById('playlist-container');
             if (!container) return;
@@ -129,10 +139,11 @@
                     div.innerText = folderName;
                     div.onclick = () => {
                         current_folder = folderName;
+                        // Clear any leftover search query when switching playlist.
                         const searchBox = document.getElementById('search-box');
                         if (searchBox) { searchBox.value = ''; filter_songs(); }
                         load_tracks();
-                        close_sidebar(); // close sidebar on mobile after pick
+                        close_sidebar();
                     };
                     container.appendChild(div);
                 });
@@ -143,9 +154,11 @@
         }
 
         // ── SHUFFLE / LOOP ────────────────────────────────────────────────
+
         function toggle_shuffle() {
             is_shuffle = !is_shuffle;
             const btn = document.getElementById('shuffle-btn');
+            // White fill = active, transparent = inactive — same visual pattern as loop.
             if (is_shuffle) {
                 btn.classList.remove('glass-tint-muted');
                 btn.style.backgroundColor = 'white';
@@ -172,6 +185,7 @@
         }
 
         // ── TRACKS ────────────────────────────────────────────────────────
+
         async function load_tracks() {
             const res = await fetch(`/api/playlist?folder=${encodeURIComponent(current_folder)}`);
             if (!res.ok) {
@@ -187,6 +201,8 @@
             container.innerHTML = '';
 
             list.forEach(raw_item => {
+                // Filenames are expected to follow "Artist - Title" convention.
+                // If there's no dash, fall back to treating the whole name as the title.
                 let artist = "artist is in Songname itself buddy.";
                 let title = raw_item;
                 if (raw_item.includes('-')) {
@@ -200,6 +216,8 @@
                 div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
                 div.onclick = () => play_song(raw_item, title, artist);
 
+                // The queue button prepends to play_next_queue, so the chosen track
+                // plays immediately after the current one, regardless of shuffle order.
                 const queue_btn = document.createElement('button');
                 queue_btn.className = 'queue-btn';
                 queue_btn.innerText = '⏭';
@@ -211,11 +229,12 @@
                     setTimeout(() => queue_btn.innerText = '⏭', 1000);
                 };
                 div.appendChild(queue_btn);
-                container.appendChild(div); // ← fixed duplicate append bug
+                container.appendChild(div);
             });
         }
 
         // ── PLAYBACK ──────────────────────────────────────────────────────
+
         function play_song(raw_name, title, artist) {
             has_preloaded_next = false;
             current_track_index = current_playlist.indexOf(raw_name);
@@ -231,6 +250,8 @@
 
             const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
 
+            // If the ghost player already buffered this exact URL, hand off its src
+            // so playback starts without a fresh network request.
             if (ghost_player.src === window.location.origin + new_url) {
                 console.log("Seamless hand-off from ghost player!");
                 player.src = ghost_player.src;
@@ -240,10 +261,12 @@
 
             player.play().then(() => {
                 play_btn.innerText = "⏸";
-                update_media_session(title, artist); // ← iPhone lock screen
+                update_media_session(title, artist);
             }).catch(e => console.error("Playback failed:", e));
         }
 
+        // Starts buffering the next track 30 s before the current one ends,
+        // so there's no gap when the audio element fires 'ended'.
         function preload_next_track() {
             if (current_playlist.length < 2) return;
             let next_index = current_track_index;
@@ -264,6 +287,7 @@
             const searchBox = document.getElementById('search-box');
             if (!searchBox) return;
             const query = searchBox.value.toLowerCase();
+            // Show/hide existing DOM nodes — no re-render needed.
             document.querySelectorAll('.track-item').forEach(track => {
                 track.style.display = track.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
             });
@@ -277,6 +301,7 @@
 
         function play_next() {
             if (current_playlist.length === 0) return;
+            // Manual "play next" queue takes priority over shuffle/sequential order.
             if (play_next_queue.length > 0) {
                 const next_raw = play_next_queue.shift();
                 const idx = current_playlist.indexOf(next_raw);
@@ -301,6 +326,8 @@
             load_track_from_index(current_track_index);
         }
 
+        // Re-parses the filename at a given index and calls play_song.
+        // Used by next/prev navigation so they don't duplicate the artist/title split logic.
         function load_track_from_index(index) {
             const raw_name = current_playlist[index];
             let artist = "unknown artist";
@@ -322,9 +349,11 @@
             else audio.pause();
         }
 
+        // Keep the play/pause icon in sync with the actual audio state.
         audio.addEventListener('play',  () => play_btn.innerText = '⏸');
         audio.addEventListener('pause', () => play_btn.innerText = '▶');
 
+        // Just a debug log — useful to see how far ahead the ghost player has buffered.
         ghost_player.addEventListener('progress', () => {
             if (ghost_player.buffered.length > 0) {
                 const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
@@ -332,6 +361,8 @@
             }
         });
 
+        // If the MEGA stream drops mid-track, skip to the next song after a short delay
+        // rather than leaving the player frozen on an error state.
         audio.addEventListener('error', () => {
             console.error("Playback error: File corrupted or MEGA stream failed.");
             document.getElementById('np-title').innerText = "⚠️ Stream error / Corrupted file. Skipping...";
@@ -339,6 +370,8 @@
             setTimeout(play_next, 900);
         });
 
+        // While the browser is waiting on the network, swap the title to "Loading stream..."
+        // then restore it the moment audio actually starts playing.
         let current_track_title = "";
         audio.addEventListener('waiting', () => {
             current_track_title = document.getElementById('np-title').innerText;
@@ -358,6 +391,7 @@
                 current_time_text.innerText = format_time(audio.currentTime);
                 total_time_text.innerText = format_time(audio.duration);
             }
+            // Kick off preload when 30 s remain. The flag prevents duplicate calls.
             const time_remaining = audio.duration - audio.currentTime;
             if (time_remaining <= 30 && !has_preloaded_next) {
                 has_preloaded_next = true;
@@ -365,6 +399,8 @@
             }
         });
 
+        // Draw a background bar showing how much of the file is buffered.
+        // Walks buffered ranges from the end to find the last contiguous chunk.
         const buffer_bar = document.getElementById('buffer-bar');
         audio.addEventListener('progress', () => {
             if (audio.duration > 0) {
@@ -389,6 +425,8 @@
         }
 
         // ── MEDIA SESSION API (iPhone lock screen / Control Centre) ───────
+        // Populates the system media notification with title, artist, artwork,
+        // and wires up hardware media keys / lock-screen controls.
         function update_media_session(title, artist) {
             if (!('mediaSession' in navigator)) return;
 
@@ -411,7 +449,8 @@
             });
         }
 
-        // Keep playback position in sync with lock screen scrubber
+        // Keeps the lock-screen scrubber bar in sync with actual playback position.
+        // Wrapped in try/catch because setPositionState can throw if duration is NaN.
         audio.addEventListener('timeupdate', () => {
             if ('mediaSession' in navigator && audio.duration) {
                 try {
@@ -424,7 +463,7 @@
             }
         });
 
-        // startup
+        // Boot sequence: load folder list and default playlist on page load.
         fetch_folders();
         load_tracks();
     </script>
@@ -449,7 +488,8 @@
 
         gsap.registerPlugin(Draggable);
 
-        // Only enable GSAP drag on non-touch (desktop)
+        // Draggable is only enabled on desktop. On touch devices the elastic snap
+        // would fight with native scroll, so we skip registering it entirely.
         if (!('ontouchstart' in window)) {
             Draggable.create(".custom-controls", {
                 type: "x, y",
@@ -469,9 +509,17 @@
             });
         }
 
-        toggle_shuffle(); // start in shuffle mode
+        // App launches in shuffle mode by default — calling toggle_shuffle() once flips is_shuffle
+        // to true and updates the button state without duplicating the activation logic.
+        toggle_shuffle();
     </script>
 
+    <!--
+        Hidden SVG filter bank.
+        These fractalNoise + feDisplacementMap combos create the subtle wavy glass-warp
+        effect on the player bar, track cards, and playlist panel.
+        Different scale values = different intensity per surface.
+    -->
 <svg style="display: none" xmlns="http://www.w3.org/2000/svg">
     <filter id="glass-blur-player" x="0" y="0" width="100%" height="100%" filterUnits="objectBoundingBox">
         <feTurbulence type="fractalNoise" baseFrequency="0.003 0.007" numOctaves="1" result="turbulence" />

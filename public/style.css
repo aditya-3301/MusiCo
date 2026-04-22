@@ -1,4 +1,7 @@
-/* glass variables */
+/* ── CSS custom properties ──────────────────────────────────────────────────
+   --bg-tint is overridden per-element via utility classes (.glass-tint-black,
+   .glass-tint-muted) to drive the glassmorphism colour without duplicating
+   the backdrop-filter / border maths everywhere.                           */
 :root {
     --bg-tint: transparent;
     --glass-bg: color-mix(in oklab, var(--bg-tint) 80%, transparent);
@@ -10,7 +13,7 @@
 .glass-tint-black { --bg-tint: black; }
 .glass-tint-muted { --bg-tint: rgba(255, 255, 255, 0.1); }
 
-/* --- BASE --- */
+/* ── RESET ──────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
 body { 
@@ -21,15 +24,16 @@ body {
     display: flex; 
     flex-direction: column; 
     height: 100vh;
-    height: 100dvh; /* dynamic viewport for iOS Safari */
+    height: 100dvh;         /* 100dvh accounts for the iOS Safari address bar shrinking. */
     overflow: hidden;
-    /* iPhone safe areas */
+    /* Respect iPhone notch / home-indicator safe areas. */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
 }
 
+/* The particles canvas needs to fill the viewport and stay behind every other layer. */
 #particles-js {
     position: fixed !important;
     top: 0;
@@ -41,7 +45,7 @@ body {
     pointer-events: none;
 }
 
-/* --- HAMBURGER (mobile only) --- */
+/* ── HAMBURGER (mobile only — shown via media query below) ──────────────── */
 #hamburger-btn {
     display: none;
     position: fixed;
@@ -71,7 +75,7 @@ body {
     transition: 0.2s;
 }
 
-/* Sidebar close button (mobile) */
+/* ── SIDEBAR CLOSE BUTTON (appears inside the sidebar on mobile) ─────────── */
 #sidebar-close-btn {
     display: none;
     background: none;
@@ -92,7 +96,7 @@ body {
 }
 .sidebar-header h2 { margin: 0 0 10px 0; font-size: 16px; }
 
-/* Overlay for mobile sidebar */
+/* ── SIDEBAR OVERLAY (darkens content area when sidebar is open on mobile) ─ */
 #sidebar-overlay {
     display: none;
     position: fixed;
@@ -104,7 +108,7 @@ body {
 }
 #sidebar-overlay.visible { display: block; }
 
-/* --- PLAYER BAR --- */
+/* ── PLAYER BAR ──────────────────────────────────────────────────────────── */
 .player-bar { 
     width: 100%; 
     min-height: var(--player-height);
@@ -115,9 +119,10 @@ body {
     padding: 12px 16px;
     gap: 10px;
     position: relative;
-    flex-shrink: 0;
+    flex-shrink: 0;     /* Never let the main content squash the player bar. */
 }
 
+/* The ::before pseudo-element carries the blur so it doesn't affect children. */
 .player-bar::before {
     content: "";
     position: absolute;
@@ -129,7 +134,10 @@ body {
     pointer-events: none;
 }
 
-/* --- CONTROLS PILL --- */
+/* ── CONTROLS PILL ───────────────────────────────────────────────────────── */
+/* Two pseudo-elements layer the glass effect:
+   ::before  — blur + SVG warp filter (the frosted look)
+   ::after   — inset highlight border (the glass edge shine)             */
 .custom-controls { 
     position: relative; 
     display: flex; 
@@ -170,9 +178,10 @@ body {
     z-index: -1;
     pointer-events: none;
 }
+/* Keep child buttons above the pseudo-elements. */
 .custom-controls > * { position: relative; z-index: 1; }
 
-/* --- BUTTONS --- */
+/* ── CONTROL BUTTONS ─────────────────────────────────────────────────────── */
 .custom-controls button { 
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
@@ -186,8 +195,7 @@ body {
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.2), 
                 inset 0 1px 1px 0 rgba(255, 255, 255, 0.2); 
     transition: all 0.3s ease;
-    /* Touch-friendly tap target */
-    min-width: 44px;
+    min-width: 44px;    /* 44 × 44 pt is Apple's minimum recommended touch target. */
     min-height: 44px;
     display: flex;
     align-items: center;
@@ -201,13 +209,14 @@ body {
     color: #1db954; 
     border-color: rgba(255, 255, 255, 0.4);
 }
-/* No scale on touch to avoid sticky hover states */
+/* On real touch screens hover styles stay "stuck" after a tap.
+   Disable the scale hover and use :active for feedback instead.  */
 @media (hover: none) {
     .custom-controls button:hover { transform: none; }
     .custom-controls button:active { transform: scale(0.95); color: #1db954; }
 }
 
-/* --- PROGRESS BAR --- */
+/* ── PROGRESS BAR ────────────────────────────────────────────────────────── */
 #progress-bar {
     width: 100%;
     position: relative;
@@ -217,7 +226,7 @@ body {
     margin: 0;
     -webkit-appearance: none;
     appearance: none;
-    height: 20px; /* taller tap target on mobile */
+    height: 20px;   /* Taller invisible hit area makes seeking easier on mobile. */
     padding: 4px 0;
 }
 #progress-bar::-webkit-slider-runnable-track {
@@ -245,7 +254,7 @@ body {
     white-space: nowrap;
 }
 
-/* --- NOW PLAYING --- */
+/* ── NOW PLAYING ─────────────────────────────────────────────────────────── */
 #now-playing { 
     text-align: center; 
     width: 100%; 
@@ -270,9 +279,11 @@ body {
     margin-left: 8px; 
     vertical-align: middle;
 }
+/* Show a bullet separator only when an artist string is actually present. */
 #np-artist:not(:empty)::before { content: "•"; margin-right: 8px; color: #4b5563; }
 
-/* --- TRACK LIST --- */
+/* ── TRACK LIST ──────────────────────────────────────────────────────────── */
+/* Same two-pseudo-element glass trick as the controls pill. */
 .track-item { 
     position: relative;
     display: flex; 
@@ -311,7 +322,9 @@ body {
 .track-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
 .track-artist { color: #9ca3af; font-size: 13px; }
 
-/* Queue button: always visible on touch devices */
+/* ── QUEUE BUTTON ────────────────────────────────────────────────────────── */
+/* Hidden by default on desktop; revealed on row hover.
+   On touch devices it stays half-visible so users know it's there.   */
 .queue-btn {
     position: absolute;
     right: 12px;
@@ -336,13 +349,12 @@ body {
 .track-item:hover .queue-btn { opacity: 1; }
 .queue-btn:hover { background: rgba(255,255,255,0.15); color: white; }
 
-/* On touch: always show queue btn */
 @media (hover: none) {
     .queue-btn { opacity: 0.5; }
     .track-item:active .queue-btn { opacity: 1; }
 }
 
-/* --- SEARCH --- */
+/* ── SEARCH BOX ──────────────────────────────────────────────────────────── */
 #search-box { 
     width: 100%; 
     padding: 11px 14px;
@@ -356,7 +368,7 @@ body {
     outline: none; 
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: 0.3s;
-    font-size: 16px; /* prevents iOS zoom on focus */
+    font-size: 16px;    /* Below 16 px iOS Safari auto-zooms into the input on focus. */
 }
 #search-box:focus {
     background: rgba(255, 255, 255, 0.1);
@@ -364,12 +376,13 @@ body {
 }
 #search-box::placeholder { color: #9ca3af; }
 
-/* --- LAYOUT --- */
+/* ── LAYOUT ──────────────────────────────────────────────────────────────── */
+/* .layout fills whatever height the player bar doesn't consume. */
 .layout { 
     display: flex; 
     flex: 1; 
     overflow: hidden;
-    min-height: 0;
+    min-height: 0;  /* Without this, flex children can overflow their container. */
 }
 
 .sidebar { 
@@ -390,14 +403,14 @@ body {
     overflow-y: auto; 
     background: linear-gradient(to bottom, rgba(31, 41, 55, 0.2), rgba(11, 15, 25, 0.6)); 
     padding-bottom: 20px;
-    -webkit-overflow-scrolling: touch;
+    -webkit-overflow-scrolling: touch;     /* Momentum scrolling on iOS. */
 }
 .content h1 {
     font-size: 18px;
     margin-top: 0;
 }
 
-/* --- PROGRESS / BUFFER --- */
+/* ── PROGRESS / BUFFER OVERLAY ───────────────────────────────────────────── */
 .progress-container {
     display: flex;
     align-items: center;
@@ -412,6 +425,8 @@ body {
     align-items: center;
     height: 20px;
 }
+/* buffer-bar sits below the range input in the stacking order and
+   grows via JS as the audio element buffers more of the file.      */
 #buffer-bar {
     position: absolute;
     left: 0;
@@ -424,7 +439,9 @@ body {
     z-index: 1;
 }
 
-/* --- PLAYLIST SIDEBAR --- */
+/* ── PLAYLIST PANEL ──────────────────────────────────────────────────────── */
+/* Uses the same glass trick as the controls pill.
+   GSAP Draggable targets this wrapper on desktop for the springy drag effect. */
 #playlist-wrapper {
     position: relative;
     margin-top: 16px;
@@ -463,10 +480,11 @@ body {
     padding-right: 4px;
     -webkit-overflow-scrolling: touch;
 }
+/* Slim custom scrollbar so it doesn't blow the glass aesthetic. */
 #playlist-container::-webkit-scrollbar { width: 4px; }
 #playlist-container::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
-/* --- FOLDER ITEMS --- */
+/* ── FOLDER ITEMS ────────────────────────────────────────────────────────── */
 .folder-item {
     padding: 11px 14px;
     margin-bottom: 8px;
@@ -484,6 +502,7 @@ body {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
 }
+/* Folder icon is greyscale at rest, full colour on hover. */
 .folder-item::before {
     content: "📁";
     margin-right: 10px;
@@ -498,7 +517,7 @@ body {
 .folder-item:hover::before { filter: grayscale(0%) opacity(1); }
 .folder-item:active { background: rgba(255,255,255,0.12); }
 
-/* --- AUTH BUTTON --- */
+/* ── AUTH BUTTON ─────────────────────────────────────────────────────────── */
 #auth-btn {
     position: fixed;
     top: 16px;
@@ -525,15 +544,16 @@ body {
     transform: translateY(-2px);
 }
 
-/* ═══════════════════════════════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE  (≤ 640px)
-═══════════════════════════════════════════════════════════════ */
+   Sidebar switches from an always-visible column to a slide-in drawer.
+══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
 
     #hamburger-btn { display: flex; }
     #sidebar-close-btn { display: block; }
 
-    /* Sidebar slides in from left */
+    /* Sidebar starts off-screen and slides in from the left. */
     .sidebar {
         position: fixed;
         top: 0;
@@ -553,27 +573,23 @@ body {
         transform: translateX(0);
     }
 
-    /* Full-width content on mobile */
     .content {
         width: 100%;
         padding: 12px;
-        padding-top: 60px; /* room for hamburger */
+        padding-top: 60px;  /* Clear the hamburger button. */
     }
     .content h1 { font-size: 16px; }
 
-    /* Compact player */
     .player-bar {
         padding: 10px 12px;
         gap: 8px;
         min-height: unset;
     }
 
-    /* Tighter controls on small screen */
     .custom-controls {
         gap: 8px;
         padding: 8px 14px;
-        /* disable GSAP drag on mobile */
-        cursor: default;
+        cursor: default;    /* GSAP drag is disabled on mobile, so normal cursor. */
     }
     .custom-controls button {
         padding: 8px 12px;
@@ -582,7 +598,6 @@ body {
         min-height: 40px;
     }
 
-    /* Hide emoji labels, keep icons tight */
     #shuffle-btn, #loop-btn { padding: 8px 10px; }
 
     #np-title { font-size: 13px; max-width: 55vw; }
@@ -595,7 +610,6 @@ body {
         right: 12px;
     }
 
-    /* Track items: bigger tap target */
     .track-item { padding: 14px 14px; }
     .track-title { font-size: 14px; }
     .track-artist { font-size: 12px; }
@@ -603,8 +617,10 @@ body {
     #current-time, #total-time { font-size: 10px; min-width: 28px; }
 }
 
-/* Tiny phones */
+/* ── TINY PHONES (≤ 375px) ───────────────────────────────────────────────── */
+/* Shuffle and loop are hidden entirely to stop the controls overflowing on
+   very small screens like an iPhone SE (1st gen).                          */
 @media (max-width: 375px) {
     .custom-controls button { padding: 6px 9px; font-size: 14px; }
-    #shuffle-btn, #loop-btn { display: none; } /* hide shuffle/loop to save space */
+    #shuffle-btn, #loop-btn { display: none; }
 }
