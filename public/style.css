@@ -580,10 +580,7 @@ body {
         body {
             display: flex;
             flex-direction: column;
-            transform: scale(0.7);
-            transform-origin: top left;
-            width: 142.8%;   /* 1 / 0.7 = 1.428 — fills the gap the scale creates */
-            height: 142.8%;
+            zoom:0.7;
         }
 
     /* .layout (track list + sidebar) fills the middle. */
