@@ -576,10 +576,15 @@ body {
     }
 
     /* ── Body: make it a flex column so order works ── */
-    body {
-        display: flex;
-        flex-direction: column;
-    }
+    /* ── Body: scaled down + flex column for ordering ── */
+        body {
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.7);
+            transform-origin: top left;
+            width: 142.8%;   /* 1 / 0.7 = 1.428 — fills the gap the scale creates */
+            height: 142.8%;
+        }
 
     /* .layout (track list + sidebar) fills the middle. */
     .layout {
