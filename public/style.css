@@ -108,7 +108,8 @@ body {
 }
 #sidebar-overlay.visible { display: block; }
 
-/* ── PLAYER BAR ──────────────────────────────────────────────────────────── */
+/* ── PLAYER BAR ──────────────────────────────────────────────────────────────
+   flex-direction: column lets mobile override child order via `order` property. */
 .player-bar { 
     width: 100%; 
     min-height: var(--player-height);
@@ -546,14 +547,75 @@ body {
 
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE  (≤ 640px)
-   Sidebar switches from an always-visible column to a slide-in drawer.
+   Key changes vs desktop:
+   • Player bar moves to the BOTTOM (order: 3) — standard music-app pattern.
+   • Auth button drops below the hamburger so they don't collide.
+   • Content no longer needs massive padding-top; the player is gone from top.
+   • Now-playing text moves to the top of the player bar (order swap via flex).
 ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
 
+    /* ── Show mobile-only chrome ── */
     #hamburger-btn { display: flex; }
     #sidebar-close-btn { display: block; }
 
-    /* Sidebar starts off-screen and slides in from the left. */
+    /* ── Auth button: below the hamburger, not beside it ── */
+    #auth-btn {
+        position: fixed;
+        /* Sit just below the hamburger (44px tall + 16px top + 8px gap). */
+        top: 76px;
+        left: 16px;
+        right: auto;
+        font-size: 11px;
+        padding: 7px 12px;
+        min-height: 36px;
+        border-radius: 14px;
+        /* Slightly less prominent so it doesn't fight the hamburger visually. */
+        background: rgba(255, 255, 255, 0.07);
+        box-shadow: none;
+    }
+
+    /* ── Body: make it a flex column so order works ── */
+    body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* .layout (track list + sidebar) fills the middle. */
+    .layout {
+        order: 2;
+        flex: 1;
+        min-height: 0;
+    }
+
+    /* Player bar sinks to the bottom. */
+    .player-bar {
+        order: 3;
+        padding: 10px 14px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+        gap: 6px;
+        min-height: unset;
+        /* Top border gives a clean shelf edge instead of floating in space. */
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* ── Now-playing floats to the TOP of the player bar ──
+       HTML order is: controls → progress → now-playing.
+       On mobile we want: now-playing → progress → controls.  */
+    #now-playing  { order: 1; }
+    .progress-container { order: 2; }
+    .custom-controls    { order: 3; }
+
+    /* ── Content: no giant padding-top needed anymore ── */
+    .content {
+        width: 100%;
+        padding: 12px;
+        /* Only need room for hamburger + auth badge stacked at top-left. */
+        padding-top: 130px;
+    }
+    .content h1 { font-size: 15px; margin-bottom: 8px; }
+
+    /* ── Sidebar drawer ── */
     .sidebar {
         position: fixed;
         top: 0;
@@ -569,58 +631,41 @@ body {
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
-    .sidebar.open {
-        transform: translateX(0);
-    }
+    .sidebar.open { transform: translateX(0); }
 
-    .content {
-        width: 100%;
-        padding: 12px;
-        padding-top: 60px;  /* Clear the hamburger button. */
-    }
-    .content h1 { font-size: 16px; }
-
-    .player-bar {
-        padding: 10px 12px;
-        gap: 8px;
-        min-height: unset;
-    }
-
+    /* ── Controls pill: tighter on mobile ── */
     .custom-controls {
-        gap: 8px;
-        padding: 8px 14px;
+        gap: 6px;
+        padding: 6px 12px;
+        max-width: 100%;
         cursor: default;    /* GSAP drag is disabled on mobile, so normal cursor. */
     }
     .custom-controls button {
-        padding: 8px 12px;
-        font-size: 15px;
-        min-width: 40px;
-        min-height: 40px;
+        padding: 8px 10px;
+        font-size: 18px;    /* Bigger emoji icons are easier to tap. */
+        min-width: 42px;
+        min-height: 42px;
     }
 
-    #shuffle-btn, #loop-btn { padding: 8px 10px; }
+    /* Shuffle / loop get slightly less horizontal padding to save width. */
+    #shuffle-btn, #loop-btn { padding: 8px 8px; font-size: 16px; }
 
-    #np-title { font-size: 13px; max-width: 55vw; }
+    /* ── Now-playing text ── */
+    #np-title  { font-size: 13px; max-width: 75vw; }
     #np-artist { font-size: 11px; }
 
-    #auth-btn { 
-        font-size: 11px; 
-        padding: 8px 12px; 
-        top: 12px;
-        right: 12px;
-    }
-
-    .track-item { padding: 14px 14px; }
+    /* ── Track cards ── */
+    .track-item  { padding: 12px 14px; }
     .track-title { font-size: 14px; }
     .track-artist { font-size: 12px; }
 
-    #current-time, #total-time { font-size: 10px; min-width: 28px; }
+    #current-time, #total-time { font-size: 10px; min-width: 26px; }
 }
 
 /* ── TINY PHONES (≤ 375px) ───────────────────────────────────────────────── */
-/* Shuffle and loop are hidden entirely to stop the controls overflowing on
-   very small screens like an iPhone SE (1st gen).                          */
+/* Hide shuffle/loop entirely on very small screens so the controls don't overflow. */
 @media (max-width: 375px) {
-    .custom-controls button { padding: 6px 9px; font-size: 14px; }
+    .custom-controls button { padding: 7px 8px; font-size: 16px; }
     #shuffle-btn, #loop-btn { display: none; }
+    .content { padding-top: 120px; }
 }
