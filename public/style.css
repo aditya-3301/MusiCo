@@ -580,7 +580,6 @@ body {
         body {
             display: flex;
             flex-direction: column;
-            zoom:0.7;
         }
 
     /* .layout (track list + sidebar) fills the middle. */
@@ -656,12 +655,15 @@ body {
     #np-title  { font-size: 13px; max-width: 75vw; }
     #np-artist { font-size: 11px; }
 
-    /* ── Track cards ── */
-    .track-item  { padding: 12px 14px; }
-    .track-title { font-size: 14px; }
-    .track-artist { font-size: 12px; }
+    .track-item  { padding: 8px 12px; margin-bottom: 6px; }
+    .track-title { font-size: 13px; }
+    .track-artist { font-size: 11px; }
 
-    #current-time, #total-time { font-size: 10px; min-width: 26px; }
+    .content h1 { font-size: 13px; margin-bottom: 4px; }
+    .content { padding-top: 120px; padding-left: 10px; padding-right: 10px; }
+
+    .custom-controls button { min-width: 38px; min-height: 38px; font-size: 16px; }
+    .custom-controls { gap: 4px; padding: 6px 10px; }
 }
 
 /* ── TINY PHONES (≤ 375px) ───────────────────────────────────────────────── */
