@@ -1,4 +1,6 @@
 require('dotenv').config();
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection (kept alive):', err.message));
+process.on('uncaughtException',  (err) => console.error('Uncaught exception (kept alive):', err.message));
 const express = require('express');
 const { Storage } = require('megajs');
 const path = require('path');
