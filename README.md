@@ -1,8 +1,7 @@
 # MusiCo
-
-**MusiCo** is a serverless personal music streaming web application.  
+  
 Instead of stupid Spotify, where you **listen to ads** and **skip music**, MusiCo uses **MEGA.nz** as a completely free, massive backend storage solution.
-
+**MusiCo** is a serverless personal music streaming web application.
 - Node.js  
 - Express  
 - Frontend wrapper via **Vercel Serverless Functions**
