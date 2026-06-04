@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 // If anything blows up asynchronously, log it but don't kill the process.
 // Vercel serverless functions would restart anyway, but this keeps local dev alive.

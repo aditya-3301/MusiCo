@@ -71,7 +71,7 @@
             </div>
         </nav>
         <main class="content">
-            <h1>All Songs in mega:</h1>
+            <h1 id="folder-title">Loading...</h1>
             <div id="track-list">loading tracks...</div>
         </main>
     </div>
@@ -136,9 +136,13 @@
                 folders.forEach(folderName => {
                     const div = document.createElement('div');
                     div.className = 'folder-item';
+                    if (folderName === current_folder) div.classList.add('active');
                     div.innerText = folderName;
                     div.onclick = () => {
                         current_folder = folderName;
+                        // Mark this folder active, clear others.
+                        container.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+                        div.classList.add('active');
                         // Clear any leftover search query when switching playlist.
                         const searchBox = document.getElementById('search-box');
                         if (searchBox) { searchBox.value = ''; filter_songs(); }
@@ -187,50 +191,60 @@
         // ── TRACKS ────────────────────────────────────────────────────────
 
         async function load_tracks() {
-            const res = await fetch(`/api/playlist?folder=${encodeURIComponent(current_folder)}`);
-            if (!res.ok) {
-                const error_msg = await res.text();
-                console.error("Server Error:", error_msg);
-                document.getElementById('track-list').innerText = `Error ${res.status}: ${error_msg}`;
-                return;
-            }
+            document.getElementById('track-list').innerText = 'loading tracks...';
+            document.getElementById('folder-title').innerText = current_folder;
 
-            const list = await res.json();
-            current_playlist = list;
-            const container = document.getElementById('track-list');
-            container.innerHTML = '';
-
-            list.forEach(raw_item => {
-                // Filenames are expected to follow "Artist - Title" convention.
-                // If there's no dash, fall back to treating the whole name as the title.
-                let artist = "artist is in Songname itself buddy.";
-                let title = raw_item;
-                if (raw_item.includes('-')) {
-                    const parts = raw_item.split('-');
-                    artist = parts[0].trim();
-                    title = parts.slice(1).join('-').trim();
+            try {
+                const res = await fetch(`/api/playlist?folder=${encodeURIComponent(current_folder)}`);
+                if (!res.ok) {
+                    const error_msg = await res.text();
+                    console.error("Server Error:", error_msg);
+                    document.getElementById('track-list').innerText = `Error ${res.status}: ${error_msg}`;
+                    return;
                 }
 
-                const div = document.createElement('div');
-                div.className = 'track-item';
-                div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
-                div.onclick = () => play_song(raw_item, title, artist);
+                const list = await res.json();
+                current_playlist = list;
+                const container = document.getElementById('track-list');
+                container.innerHTML = '';
 
-                // The queue button prepends to play_next_queue, so the chosen track
-                // plays immediately after the current one, regardless of shuffle order.
-                const queue_btn = document.createElement('button');
-                queue_btn.className = 'queue-btn';
-                queue_btn.innerText = '⏭';
-                queue_btn.title = 'Play next';
-                queue_btn.onclick = (e) => {
-                    e.stopPropagation();
-                    play_next_queue.unshift(raw_item);
-                    queue_btn.innerText = '✓';
-                    setTimeout(() => queue_btn.innerText = '⏭', 1000);
-                };
-                div.appendChild(queue_btn);
-                container.appendChild(div);
-            });
+                list.forEach((raw_item, idx) => {
+                    // Filenames are expected to follow "Artist - Title" convention.
+                    // If there's no dash, leave artist blank — the bullet separator
+                    // in CSS is :not(:empty) so it won't show for empty strings.
+                    let artist = "";
+                    let title = raw_item;
+                    if (raw_item.includes('-')) {
+                        const parts = raw_item.split('-');
+                        artist = parts[0].trim();
+                        title = parts.slice(1).join('-').trim();
+                    }
+
+                    const div = document.createElement('div');
+                    div.className = 'track-item';
+                    div.dataset.index = idx;
+                    div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
+                    div.onclick = () => play_song(raw_item, title, artist);
+
+                    // The queue button prepends to play_next_queue, so the chosen track
+                    // plays immediately after the current one, regardless of shuffle order.
+                    const queue_btn = document.createElement('button');
+                    queue_btn.className = 'queue-btn';
+                    queue_btn.innerText = '⏭';
+                    queue_btn.title = 'Play next';
+                    queue_btn.onclick = (e) => {
+                        e.stopPropagation();
+                        play_next_queue.unshift(raw_item);
+                        queue_btn.innerText = '✓';
+                        setTimeout(() => queue_btn.innerText = '⏭', 1000);
+                    };
+                    div.appendChild(queue_btn);
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                document.getElementById('track-list').innerText = 'Failed to load tracks. Check your connection.';
+                console.error("Track Fetch Error:", error);
+            }
         }
 
         // ── PLAYBACK ──────────────────────────────────────────────────────
@@ -238,6 +252,11 @@
         function play_song(raw_name, title, artist) {
             has_preloaded_next = false;
             current_track_index = current_playlist.indexOf(raw_name);
+
+            // Highlight the active track in the list.
+            document.querySelectorAll('.track-item').forEach(el => el.classList.remove('playing'));
+            const active_el = document.querySelector(`.track-item[data-index="${current_track_index}"]`);
+            if (active_el) active_el.classList.add('playing');
 
             document.getElementById('np-title').innerText = title;
             document.getElementById('np-artist').innerText = artist;
@@ -321,8 +340,16 @@
 
         function play_prev() {
             if (current_playlist.length === 0) return;
-            current_track_index--;
-            if (current_track_index < 0) current_track_index = current_playlist.length - 1;
+            if (is_shuffle && current_playlist.length > 1) {
+                let random_index = current_track_index;
+                while (random_index === current_track_index) {
+                    random_index = Math.floor(Math.random() * current_playlist.length);
+                }
+                current_track_index = random_index;
+            } else {
+                current_track_index--;
+                if (current_track_index < 0) current_track_index = current_playlist.length - 1;
+            }
             load_track_from_index(current_track_index);
         }
 
@@ -330,7 +357,7 @@
         // Used by next/prev navigation so they don't duplicate the artist/title split logic.
         function load_track_from_index(index) {
             const raw_name = current_playlist[index];
-            let artist = "unknown artist";
+            let artist = "";
             let title = raw_name;
             if (raw_name.includes('-')) {
                 const parts = raw_name.split('-');
