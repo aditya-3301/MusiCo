@@ -55,6 +55,15 @@
         <audio id="audio-player" playsinline></audio>
     </div>
 
+    <!-- Mobile-only: persistent search + folder tabs replacing the sidebar drawer.
+         Hidden on desktop via CSS; the sidebar handles that role there.          -->
+    <div id="mobile-top-bar">
+        <div id="mobile-top-row">
+            <input type="text" id="mobile-search-box" placeholder="🔍 Search songs..." oninput="filter_songs()">
+        </div>
+        <div id="mobile-folder-tabs"></div>
+    </div>
+
     <div class="layout">
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -123,36 +132,70 @@
         // ── FOLDERS ──────────────────────────────────────────────────────
 
         async function fetch_folders() {
-            const container = document.getElementById('playlist-container');
-            if (!container) return;
-            container.innerHTML = '<div style="padding: 10px; font-size: 13px; color: #9ca3af;">Loading folders...</div>';
+            const container   = document.getElementById('playlist-container');
+            const mobile_tabs = document.getElementById('mobile-folder-tabs');
+            if (container)   container.innerHTML = '<div style="padding: 10px; font-size: 13px; color: #9ca3af;">Loading folders...</div>';
+            if (mobile_tabs) mobile_tabs.innerHTML = '';
 
             try {
                 const res = await fetch(`/api/folders`);
                 if (!res.ok) throw new Error("Failed to fetch folders");
                 const folders = await res.json();
-                container.innerHTML = '';
+                if (container) container.innerHTML = '';
 
                 folders.forEach(folderName => {
-                    const div = document.createElement('div');
-                    div.className = 'folder-item';
-                    if (folderName === current_folder) div.classList.add('active');
-                    div.innerText = folderName;
-                    div.onclick = () => {
-                        current_folder = folderName;
-                        // Mark this folder active, clear others.
-                        container.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
-                        div.classList.add('active');
-                        // Clear any leftover search query when switching playlist.
-                        const searchBox = document.getElementById('search-box');
-                        if (searchBox) { searchBox.value = ''; filter_songs(); }
-                        load_tracks();
-                        close_sidebar();
-                    };
-                    container.appendChild(div);
+                    // ── Desktop sidebar item ──────────────────────────────
+                    if (container) {
+                        const div = document.createElement('div');
+                        div.className = 'folder-item';
+                        if (folderName === current_folder) div.classList.add('active');
+                        div.innerText = folderName;
+                        div.onclick = () => {
+                            current_folder = folderName;
+                            // Mark this folder active, clear others.
+                            container.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+                            div.classList.add('active');
+                            // Sync mobile tabs too.
+                            if (mobile_tabs) {
+                                mobile_tabs.querySelectorAll('.mobile-folder-tab').forEach(el => el.classList.remove('active'));
+                                const match = [...mobile_tabs.querySelectorAll('.mobile-folder-tab')].find(el => el.dataset.folder === folderName);
+                                if (match) match.classList.add('active');
+                            }
+                            // Clear any leftover search query when switching playlist.
+                            const searchBox = document.getElementById('search-box');
+                            if (searchBox) { searchBox.value = ''; filter_songs(); }
+                            load_tracks();
+                            close_sidebar();
+                        };
+                        container.appendChild(div);
+                    }
+
+                    // ── Mobile pill tab ───────────────────────────────────
+                    if (mobile_tabs) {
+                        const tab = document.createElement('div');
+                        tab.className = 'mobile-folder-tab';
+                        tab.dataset.folder = folderName;
+                        if (folderName === current_folder) tab.classList.add('active');
+                        tab.innerText = folderName;
+                        tab.onclick = () => {
+                            current_folder = folderName;
+                            mobile_tabs.querySelectorAll('.mobile-folder-tab').forEach(el => el.classList.remove('active'));
+                            tab.classList.add('active');
+                            // Sync desktop sidebar too.
+                            if (container) {
+                                container.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+                                const match = [...container.querySelectorAll('.folder-item')].find(el => el.innerText === folderName);
+                                if (match) match.classList.add('active');
+                            }
+                            const mobileSearch = document.getElementById('mobile-search-box');
+                            if (mobileSearch) { mobileSearch.value = ''; filter_songs(); }
+                            load_tracks();
+                        };
+                        mobile_tabs.appendChild(tab);
+                    }
                 });
             } catch (error) {
-                container.innerHTML = '<div style="padding: 10px; color: #ff4d4d;">Failed to load folders.</div>';
+                if (container) container.innerHTML = '<div style="padding: 10px; color: #ff4d4d;">Failed to load folders.</div>';
                 console.error("Folder Fetch Error:", error);
             }
         }
@@ -303,9 +346,14 @@
         }
 
         function filter_songs() {
-            const searchBox = document.getElementById('search-box');
-            if (!searchBox) return;
-            const query = searchBox.value.toLowerCase();
+            // Use whichever search box is currently visible:
+            // mobile-search-box on ≤640px, sidebar search-box on desktop.
+            const mobile_box  = document.getElementById('mobile-search-box');
+            const desktop_box = document.getElementById('search-box');
+            const is_mobile   = window.matchMedia('(max-width: 640px)').matches;
+            const active_box  = is_mobile ? mobile_box : desktop_box;
+            if (!active_box) return;
+            const query = active_box.value.toLowerCase();
             // Show/hide existing DOM nodes — no re-render needed.
             document.querySelectorAll('.track-item').forEach(track => {
                 track.style.display = track.innerText.toLowerCase().includes(query) ? 'flex' : 'none';

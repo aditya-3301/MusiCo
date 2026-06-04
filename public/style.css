@@ -564,42 +564,124 @@ body {
     transform: translateY(-2px);
 }
 
+/* ── MOBILE TOP BAR (hidden on desktop, replaces sidebar+hamburger on mobile) ─
+   Always visible on ≤640px: one search input + horizontal folder pill row.
+   z-index 300 keeps it below the auth button (1000) but above track list.    */
+#mobile-top-bar {
+    display: none;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE  (≤ 640px)
    Key changes vs desktop:
+   • Sidebar + hamburger replaced by a permanent #mobile-top-bar (search + tabs).
    • Player bar moves to the BOTTOM (order: 3) — standard music-app pattern.
-   • Auth button drops below the hamburger so they don't collide.
-   • Content no longer needs massive padding-top; the player is gone from top.
+   • Auth button returns to top-right, compact size.
    • Now-playing text moves to the top of the player bar (order swap via flex).
 ══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
 
-    /* ── Show mobile-only chrome ── */
-    #hamburger-btn { display: flex; }
-    #sidebar-close-btn { display: block; }
+    /* ── Hide desktop sidebar chrome entirely ── */
+    #hamburger-btn    { display: none !important; }
+    #sidebar-close-btn { display: none !important; }
+    #sidebar-overlay  { display: none !important; }
+    .sidebar          { display: none !important; }
 
-    /* ── Auth button: below the hamburger, not beside it ── */
+    /* ── Show mobile top bar ── */
+    #mobile-top-bar {
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 300;
+        padding: 10px 12px 8px;
+        padding-top: calc(10px + env(safe-area-inset-top));
+        gap: 8px;
+        background: rgba(11, 15, 25, 0.88);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    #mobile-top-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    #mobile-search-box {
+        flex: 1;
+        padding: 10px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.07);
+        color: white;
+        font-size: 16px;   /* Below 16px iOS Safari auto-zooms on focus. */
+        outline: none;
+        -webkit-appearance: none;
+        transition: 0.2s;
+    }
+    #mobile-search-box::placeholder { color: rgba(255,255,255,0.38); }
+    #mobile-search-box:focus {
+        border-color: rgba(29, 185, 84, 0.5);
+        background: rgba(255, 255, 255, 0.1);
+    }
+    #mobile-folder-tabs {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    #mobile-folder-tabs::-webkit-scrollbar { display: none; }
+    .mobile-folder-tab {
+        flex-shrink: 0;
+        padding: 6px 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.06);
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        transition: all 0.2s;
+    }
+    .mobile-folder-tab.active {
+        background: rgba(29, 185, 84, 0.14);
+        border-color: rgba(29, 185, 84, 0.45);
+        color: #1db954;
+        font-weight: 600;
+    }
+    .mobile-folder-tab:active { opacity: 0.75; }
+
+    /* ── Auth button: compact, top-right corner ── */
     #auth-btn {
         position: fixed;
-        /* Sit just below the hamburger (44px tall + 16px top + 8px gap). */
-        top: 76px;
-        left: 16px;
-        right: auto;
+        top: 10px;
+        top: calc(10px + env(safe-area-inset-top));
+        right: 12px;
+        left: auto;
         font-size: 11px;
-        padding: 7px 12px;
-        min-height: 36px;
-        border-radius: 14px;
-        /* Slightly less prominent so it doesn't fight the hamburger visually. */
+        padding: 7px 10px;
+        min-height: 34px;
+        border-radius: 12px;
         background: rgba(255, 255, 255, 0.07);
         box-shadow: none;
+        z-index: 400; /* above mobile-top-bar so it's always tappable */
     }
 
     /* ── Body: make it a flex column so order works ── */
-    /* ── Body: scaled down + flex column for ordering ── */
-        body {
-            display: flex;
-            flex-direction: column;
-        }
+    body {
+        display: flex;
+        flex-direction: column;
+    }
 
     /* .layout (track list + sidebar) fills the middle. */
     .layout {
@@ -626,45 +708,28 @@ body {
     .progress-container { order: 2; }
     .custom-controls    { order: 3; }
 
-    /* ── Content: no giant padding-top needed anymore ── */
+    /* ── Content: padding-top must clear the mobile-top-bar.
+       Bar = safe-area + 10px padding + search(~44px) + gap(8px) + tabs(~36px) + 8px bottom ≈ 116px base.
+       Add ~12px breathing room = 128px. Safe-area handled separately via env(). */
     .content {
         width: 100%;
-        padding: 12px;
-        /* Only need room for hamburger + auth badge stacked at top-left. */
-        padding-top: 130px;
+        padding: 12px 10px;
+        padding-top: calc(128px + env(safe-area-inset-top));
     }
-    .content h1 { font-size: 15px; margin-bottom: 8px; }
-
-    /* ── Sidebar drawer ── */
-    .sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 80vw;
-        max-width: 300px;
-        transform: translateX(-110%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 500;
-        padding: 20px 16px;
-        padding-top: calc(20px + env(safe-area-inset-top));
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    .sidebar.open { transform: translateX(0); }
+    .content h1 { font-size: 13px; margin-bottom: 4px; }
 
     /* ── Controls pill: tighter on mobile ── */
     .custom-controls {
-        gap: 6px;
-        padding: 6px 12px;
+        gap: 4px;
+        padding: 6px 10px;
         max-width: 100%;
         cursor: default;    /* GSAP drag is disabled on mobile, so normal cursor. */
     }
     .custom-controls button {
         padding: 8px 10px;
-        font-size: 18px;    /* Bigger emoji icons are easier to tap. */
-        min-width: 42px;
-        min-height: 42px;
+        font-size: 16px;
+        min-width: 38px;
+        min-height: 38px;
     }
 
     /* Shuffle / loop get slightly less horizontal padding to save width. */
@@ -677,18 +742,15 @@ body {
     .track-item  { padding: 8px 12px; margin-bottom: 6px; }
     .track-title { font-size: 13px; }
     .track-artist { font-size: 11px; }
-
-    .content h1 { font-size: 13px; margin-bottom: 4px; }
-    .content { padding-top: 120px; padding-left: 10px; padding-right: 10px; }
-
-    .custom-controls button { min-width: 38px; min-height: 38px; font-size: 16px; }
-    .custom-controls { gap: 4px; padding: 6px 10px; }
 }
 
 /* ── TINY PHONES (≤ 375px) ───────────────────────────────────────────────── */
-/* Hide shuffle/loop entirely on very small screens so the controls don't overflow. */
+/* Shrink all five control buttons to fit — DO NOT hide shuffle/loop.
+   5 buttons × 32px + 4 gaps × 3px + 16px pill padding ≈ 188px, fits fine.  */
 @media (max-width: 375px) {
-    .custom-controls button { padding: 7px 8px; font-size: 16px; }
-    #shuffle-btn, #loop-btn { display: none; }
-    .content { padding-top: 120px; }
+    .custom-controls { gap: 3px; padding: 5px 8px; }
+    .custom-controls button { padding: 6px 6px; font-size: 14px; min-width: 32px; min-height: 34px; }
+    #shuffle-btn, #loop-btn { font-size: 13px; }
+    /* Mobile top bar slightly tighter on tiny screens. */
+    .content { padding-top: calc(120px + env(safe-area-inset-top)); }
 }
