@@ -107,11 +107,18 @@
         let current_folder = 'main';
         let play_next_queue = [];   // tracks queued with the ⏭ "play next" button
 
-        // ghost_player silently preloads the upcoming track while the current one plays,
-        // so switching songs feels instant without any buffering gap.
-        const ghost_player = new Audio();
-        ghost_player.preload = 'auto'; 
+        // ghost_player silently preloads the upcoming track while the current one plays.
+        // HANDOFF STRATEGY: instead of copying ghost_player.src to the main player (which
+        // would throw away the buffered data and start a fresh download), we swap the two
+        // Audio objects so the ghost — already buffered — becomes the main player.
+        let ghost_player = new Audio();
+        ghost_player.preload = 'auto';
         let has_preloaded_next = false;
+        let preloaded_index = -1; // which playlist index ghost has loaded
+
+        // play_history keeps track of every index we've visited so that ⏮ always goes
+        // back to the real previous song, even in shuffle mode.
+        let play_history = [];
 
         // ── SIDEBAR MOBILE TOGGLE ──────────────────────────────────────────
 
@@ -292,9 +299,19 @@
 
         // ── PLAYBACK ──────────────────────────────────────────────────────
 
-        function play_song(raw_name, title, artist) {
+        function play_song(raw_name, title, artist, skip_history = false) {
+            const new_index = current_playlist.indexOf(raw_name);
+
+            // Push the current song to history before changing current_track_index,
+            // but only when navigating forward (not when play_prev itself calls us).
+            if (!skip_history && current_track_index !== -1) {
+                play_history.push(current_track_index);
+                if (play_history.length > 100) play_history.shift(); // cap memory
+            }
+
             has_preloaded_next = false;
-            current_track_index = current_playlist.indexOf(raw_name);
+            preloaded_index = -1;
+            current_track_index = new_index;
 
             // Highlight the active track in the list.
             document.querySelectorAll('.track-item').forEach(el => el.classList.remove('playing'));
@@ -304,24 +321,49 @@
             document.getElementById('np-title').innerText = title;
             document.getElementById('np-artist').innerText = artist;
 
-            const player = document.getElementById('audio-player');
             const progress_bar = document.getElementById('progress-bar');
-            const play_btn = document.getElementById('play-btn');
-
             progress_bar.value = 0;
 
             const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
 
-            // If the ghost player already buffered this exact URL, hand off its src
-            // so playback starts without a fresh network request.
-            if (ghost_player.src === window.location.origin + new_url) {
-                console.log("Seamless hand-off from ghost player!");
-                player.src = ghost_player.src;
+            // ── Ghost player swap ──────────────────────────────────────────────────
+            // Copying ghost_player.src to audio.src throws away the buffered bytes —
+            // the browser still makes a fresh request. Instead, when the ghost has
+            // already buffered the right track, we SWAP the two Audio objects so the
+            // ghost (with its buffer intact) takes over as the main player, and the
+            // old main player becomes the new ghost for the next preload.
+            if (preloaded_index === new_index && ghost_player.readyState >= 2) {
+                console.log("✅ Ghost swap! Instant playback from preloaded buffer.");
+
+                // Detach all listeners from old audio element before swapping.
+                const old_audio = audio;
+                const new_audio = ghost_player;
+
+                // Swap the module-level reference so all future event listeners
+                // and function calls use the now-active element.
+                audio = new_audio;
+                ghost_player = old_audio;
+
+                // The swapped-in element isn't in the DOM — we don't need it there
+                // for playback, but we DO need the DOM element's id to stay consistent
+                // for anything that does getElementById('audio-player'). Swap DOM too.
+                const dom_audio = document.getElementById('audio-player');
+                new_audio.id = 'audio-player';
+                old_audio.id = 'audio-ghost';
+                dom_audio.parentNode.replaceChild(new_audio, dom_audio);
+
+                // Re-attach all event listeners to the new main audio element.
+                attach_audio_listeners(audio);
+
+                // Silence and reset the old player so it's ready to ghost next track.
+                ghost_player.pause();
+                ghost_player.src = '';
             } else {
-                player.src = new_url;
+                // Normal path — no usable preload, just set src directly.
+                audio.src = new_url;
             }
 
-            player.play().then(() => {
+            audio.play().then(() => {
                 play_btn.innerText = "⏸";
                 update_media_session(title, artist);
             }).catch(e => console.error("Playback failed:", e));
@@ -331,8 +373,14 @@
         // so there's no gap when the audio element fires 'ended'.
         function preload_next_track() {
             if (current_playlist.length < 2) return;
-            let next_index = current_track_index;
-            if (is_shuffle) {
+            let next_index;
+            if (play_next_queue.length > 0) {
+                // Peek at the queue without shifting — play_next will shift it.
+                const queued_raw = play_next_queue[0];
+                next_index = current_playlist.indexOf(queued_raw);
+                if (next_index === -1) next_index = (current_track_index + 1) % current_playlist.length;
+            } else if (is_shuffle) {
+                next_index = current_track_index;
                 while (next_index === current_track_index) {
                     next_index = Math.floor(Math.random() * current_playlist.length);
                 }
@@ -342,7 +390,10 @@
             const raw_name = current_playlist[next_index];
             const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
             ghost_player.src = next_url;
+            ghost_player.preload = 'auto';
             ghost_player.load();
+            preloaded_index = next_index;
+            console.log(`🔮 Preloading index ${next_index}: ${raw_name}`);
         }
 
         function filter_songs() {
@@ -360,11 +411,12 @@
             });
         }
 
-        const audio = document.getElementById('audio-player');
+        // `let` not `const` — gets reassigned when ghost player swaps in as the main player.
+        let audio = document.getElementById('audio-player');
         const play_btn = document.getElementById('play-btn');
         const progress = document.getElementById('progress-bar');
         const current_time_text = document.getElementById('current-time');
-        const total_time_text = document.getElementById('total-time');
+        const total_time_text   = document.getElementById('total-time');
 
         function play_next() {
             if (current_playlist.length === 0) return;
@@ -372,7 +424,7 @@
             if (play_next_queue.length > 0) {
                 const next_raw = play_next_queue.shift();
                 const idx = current_playlist.indexOf(next_raw);
-                if (idx !== -1) { current_track_index = idx; load_track_from_index(idx); return; }
+                if (idx !== -1) { load_track_from_index(idx); return; }
             }
             if (is_shuffle && current_playlist.length > 1) {
                 let random_index = current_track_index;
@@ -388,22 +440,28 @@
 
         function play_prev() {
             if (current_playlist.length === 0) return;
-            if (is_shuffle && current_playlist.length > 1) {
-                let random_index = current_track_index;
-                while (random_index === current_track_index) {
-                    random_index = Math.floor(Math.random() * current_playlist.length);
-                }
-                current_track_index = random_index;
-            } else {
-                current_track_index--;
-                if (current_track_index < 0) current_track_index = current_playlist.length - 1;
+            // If we're more than 3 s into a song, restart it instead of going back.
+            if (audio.currentTime > 3) {
+                audio.currentTime = 0;
+                return;
             }
-            load_track_from_index(current_track_index);
+            // Pop the real previous song from history (works in shuffle too).
+            if (play_history.length > 0) {
+                const prev_index = play_history.pop();
+                load_track_from_index(prev_index, true); // true = skip_history push
+                return;
+            }
+            // No history yet — just go one step back sequentially.
+            current_track_index--;
+            if (current_track_index < 0) current_track_index = current_playlist.length - 1;
+            load_track_from_index(current_track_index, true);
         }
 
         // Re-parses the filename at a given index and calls play_song.
         // Used by next/prev navigation so they don't duplicate the artist/title split logic.
-        function load_track_from_index(index) {
+        // skip_history = true when called from play_prev so we don't re-push to history.
+        function load_track_from_index(index, skip_history = false) {
+            current_track_index = index;
             const raw_name = current_playlist[index];
             let artist = "";
             let title = raw_name;
@@ -412,86 +470,16 @@
                 artist = parts[0].trim();
                 title = parts.slice(1).join('-').trim();
             }
-            play_song(raw_name, title, artist);
+            play_song(raw_name, title, artist, skip_history);
         }
 
         document.getElementById('next-btn').addEventListener('click', play_next);
         document.getElementById('prev-btn').addEventListener('click', play_prev);
-        audio.addEventListener('ended', play_next);
 
         function toggle_play() {
             if (audio.paused) audio.play();
             else audio.pause();
         }
-
-        // Keep the play/pause icon in sync with the actual audio state.
-        audio.addEventListener('play',  () => play_btn.innerText = '⏸');
-        audio.addEventListener('pause', () => play_btn.innerText = '▶');
-
-        // Just a debug log — useful to see how far ahead the ghost player has buffered.
-        ghost_player.addEventListener('progress', () => {
-            if (ghost_player.buffered.length > 0) {
-                const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
-                console.log(`Next song preloading: ~${loaded}MB cached in background.`);
-            }
-        });
-
-        // If the MEGA stream drops mid-track, skip to the next song after a short delay
-        // rather than leaving the player frozen on an error state.
-        audio.addEventListener('error', () => {
-            console.error("Playback error: File corrupted or MEGA stream failed.");
-            document.getElementById('np-title').innerText = "⚠️ Stream error / Corrupted file. Skipping...";
-            play_btn.innerText = '▶';
-            setTimeout(play_next, 900);
-        });
-
-        // While the browser is waiting on the network, swap the title to "Loading stream..."
-        // then restore it the moment audio actually starts playing.
-        let current_track_title = "";
-        audio.addEventListener('waiting', () => {
-            current_track_title = document.getElementById('np-title').innerText;
-            if (current_track_title !== "STREAM ERROR - Try again") {
-                document.getElementById('np-title').innerText = "Loading stream...";
-            }
-        });
-        audio.addEventListener('playing', () => {
-            if (current_track_title && document.getElementById('np-title').innerText === "Loading stream...") {
-                document.getElementById('np-title').innerText = current_track_title;
-            }
-        });
-
-        audio.addEventListener('timeupdate', () => {
-            if (audio.duration) {
-                progress.value = (audio.currentTime / audio.duration) * 100;
-                current_time_text.innerText = format_time(audio.currentTime);
-                total_time_text.innerText = format_time(audio.duration);
-            }
-            // Kick off preload when 30 s remain. The flag prevents duplicate calls.
-            const time_remaining = audio.duration - audio.currentTime;
-            if (time_remaining <= 30 && !has_preloaded_next) {
-                has_preloaded_next = true;
-                preload_next_track();
-            }
-        });
-
-        // Draw a background bar showing how much of the file is buffered.
-        // Walks buffered ranges from the end to find the last contiguous chunk.
-        const buffer_bar = document.getElementById('buffer-bar');
-        audio.addEventListener('progress', () => {
-            if (audio.duration > 0) {
-                for (let i = 0; i < audio.buffered.length; i++) {
-                    if (audio.buffered.start(audio.buffered.length - 1 - i) < audio.currentTime) {
-                        const buffered_end = audio.buffered.end(audio.buffered.length - 1 - i);
-                        buffer_bar.style.width = (buffered_end / audio.duration) * 100 + "%";
-                        break;
-                    }
-                }
-            }
-        });
-
-        progress.addEventListener('input', () => {
-            audio.currentTime = (progress.value / 100) * audio.duration;
-        });
 
         function format_time(seconds) {
             const min = Math.floor(seconds / 60);
@@ -500,11 +488,8 @@
         }
 
         // ── MEDIA SESSION API (iPhone lock screen / Control Centre) ───────
-        // Populates the system media notification with title, artist, artwork,
-        // and wires up hardware media keys / lock-screen controls.
         function update_media_session(title, artist) {
             if (!('mediaSession' in navigator)) return;
-
             navigator.mediaSession.metadata = new MediaMetadata({
                 title:  title  || 'Unknown Title',
                 artist: artist || 'Unknown Artist',
@@ -514,29 +499,88 @@
                     { src: 'https://raw.githubusercontent.com/aditya-3301/MusiCo/main/public/icon-512.png', sizes: '512x512', type: 'image/png' }
                 ]
             });
-
-            navigator.mediaSession.setActionHandler('play',         () => { audio.play();  play_btn.innerText = '⏸'; });
-            navigator.mediaSession.setActionHandler('pause',        () => { audio.pause(); play_btn.innerText = '▶'; });
-            navigator.mediaSession.setActionHandler('nexttrack',    play_next);
-            navigator.mediaSession.setActionHandler('previoustrack',play_prev);
+            navigator.mediaSession.setActionHandler('play',          () => { audio.play();  play_btn.innerText = '⏸'; });
+            navigator.mediaSession.setActionHandler('pause',         () => { audio.pause(); play_btn.innerText = '▶'; });
+            navigator.mediaSession.setActionHandler('nexttrack',     play_next);
+            navigator.mediaSession.setActionHandler('previoustrack', play_prev);
             navigator.mediaSession.setActionHandler('seekto', (details) => {
                 if (details.seekTime !== undefined) audio.currentTime = details.seekTime;
             });
         }
 
-        // Keeps the lock-screen scrubber bar in sync with actual playback position.
-        // Wrapped in try/catch because setPositionState can throw if duration is NaN.
-        audio.addEventListener('timeupdate', () => {
-            if ('mediaSession' in navigator && audio.duration) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration:     audio.duration,
-                        playbackRate: audio.playbackRate,
-                        position:     audio.currentTime
-                    });
-                } catch(e) {}
-            }
+        // ── AUDIO EVENT LISTENERS ─────────────────────────────────────────
+        // Grouped in a function so they can be re-attached after a ghost-swap.
+        let current_track_title = "";
+        const buffer_bar   = document.getElementById('buffer-bar');
+
+        function attach_audio_listeners(el) {
+            el.addEventListener('play',  () => play_btn.innerText = '⏸');
+            el.addEventListener('pause', () => play_btn.innerText = '▶');
+            el.addEventListener('ended', play_next);
+
+            el.addEventListener('error', () => {
+                console.error("Playback error: File corrupted or MEGA stream failed.");
+                document.getElementById('np-title').innerText = "⚠️ Stream error / Corrupted file. Skipping...";
+                play_btn.innerText = '▶';
+                setTimeout(play_next, 900);
+            });
+
+            // Show "Loading stream..." while buffering, restore title when playing.
+            el.addEventListener('waiting', () => {
+                current_track_title = document.getElementById('np-title').innerText;
+                if (current_track_title !== "STREAM ERROR - Try again") {
+                    document.getElementById('np-title').innerText = "Loading stream...";
+                }
+            });
+            el.addEventListener('playing', () => {
+                if (current_track_title && document.getElementById('np-title').innerText === "Loading stream...") {
+                    document.getElementById('np-title').innerText = current_track_title;
+                }
+            });
+
+            el.addEventListener('timeupdate', () => {
+                if (el.duration) {
+                    progress.value = (el.currentTime / el.duration) * 100;
+                    current_time_text.innerText = format_time(el.currentTime);
+                    total_time_text.innerText   = format_time(el.duration);
+                }
+                // Kick off preload when 30 s remain.
+                const time_remaining = el.duration - el.currentTime;
+                if (time_remaining <= 30 && !has_preloaded_next) {
+                    has_preloaded_next = true;
+                    preload_next_track();
+                }
+                // Lock-screen scrubber sync.
+                if ('mediaSession' in navigator && el.duration) {
+                    try {
+                        navigator.mediaSession.setPositionState({
+                            duration:     el.duration,
+                            playbackRate: el.playbackRate,
+                            position:     el.currentTime
+                        });
+                    } catch(e) {}
+                }
+            });
+
+            // Buffer bar.
+            el.addEventListener('progress', () => {
+                if (el.duration > 0) {
+                    for (let i = 0; i < el.buffered.length; i++) {
+                        if (el.buffered.start(el.buffered.length - 1 - i) < el.currentTime) {
+                            buffer_bar.style.width = (el.buffered.end(el.buffered.length - 1 - i) / el.duration) * 100 + "%";
+                            break;
+                        }
+                    }
+                }
+            });
+        }
+
+        progress.addEventListener('input', () => {
+            audio.currentTime = (progress.value / 100) * audio.duration;
         });
+
+        // Attach listeners to the starting audio element.
+        attach_audio_listeners(audio);
 
         // Boot sequence: load folder list and default playlist on page load.
         fetch_folders();

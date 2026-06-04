@@ -148,7 +148,6 @@ app.get('/stream', async (req, res) => {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
             // If the browser doesn't specify an end byte, serve at least 512 KB.
-            // Larger chunks mean fewer round-trips and smoother playback on slow connections.
             const MIN_CHUNK = 512 * 1024;
             const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + MIN_CHUNK, size - 1);
             const chunksize = (end - start) + 1;
@@ -164,13 +163,22 @@ app.get('/stream', async (req, res) => {
             const download_stream = song_file.download({ start, end });
             download_stream.pipe(res);
         } else {
-            // No Range header — send the whole file (happens on some mobile browsers).
-            res.writeHead(200, {
-                'Content-Length': size,
+            // No Range header — some browsers (especially mobile) send a plain GET
+            // and then wait for the ENTIRE file before starting playback.
+            // Fix: always respond 206 from byte 0 so the browser knows it's a
+            // partial/streamable response and starts playing immediately.
+            const MIN_CHUNK = 512 * 1024;
+            const end = Math.min(MIN_CHUNK - 1, size - 1);
+            const chunksize = end + 1;
+
+            res.writeHead(206, {
+                'Content-Range': `bytes 0-${end}/${size}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
                 'Content-Type': content_type,
                 'Cache-Control': 'private, max-age=3600',
             });
-            const download_stream = song_file.download();
+            const download_stream = song_file.download({ start: 0, end });
             download_stream.pipe(res);
         }
 
