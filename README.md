@@ -88,8 +88,8 @@ Deploying MusiCo to Vercel is easy.
 3. Before clicking **Deploy**, open the **Environment Variables** tab in Vercel and add the following variables:
    - `MEGA_EMAIL`
    - `MEGA_PASSWORD`
-   - `ADMIN_USER`
-   - `ADMIN_PASS`
+   - `admin_user`
+   - `admin_pass`
 4. Click **Deploy**.
 
 Vercel will automatically deploy.(hopefully :p)

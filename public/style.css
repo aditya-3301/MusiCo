@@ -96,6 +96,18 @@ body {
 }
 .sidebar-header h2 { margin: 0 0 10px 0; font-size: 16px; }
 
+/* ── SIDEBAR LOADING & ERROR TEXT ── */
+.sidebar-loading-text {
+    padding: 10px;
+    font-size: 13px;
+    color: #9ca3af;
+}
+.sidebar-error-text {
+    padding: 10px;
+    font-size: 13px;
+    color: #ff4d4d;
+}
+
 /* ── SIDEBAR OVERLAY (darkens content area when sidebar is open on mobile) ─ */
 #sidebar-overlay {
     display: none;
