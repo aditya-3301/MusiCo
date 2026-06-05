@@ -26,6 +26,38 @@
     <!-- Darkens the rest of the screen when the sidebar is open on mobile. -->
     <div id="sidebar-overlay" onclick="close_sidebar()"></div>
 
+    <!-- Secure Login Modal -->
+    <div id="login-modal-overlay" class="login-hidden">
+        <div class="login-modal" id="login-modal">
+            <button class="login-close-btn" onclick="close_login()" aria-label="Close login">✕</button>
+
+            <div class="login-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13"/>
+                    <circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                </svg>
+            </div>
+
+            <h2 class="login-title">Welcome to MusiCo</h2>
+            <p class="login-subtitle">Enter your credentials to start streaming</p>
+
+            <div class="login-field">
+                <input type="text" id="login-user" placeholder=" " autocomplete="username" required>
+                <label for="login-user">Username</label>
+            </div>
+            <div class="login-field">
+                <input type="password" id="login-pass" placeholder=" " autocomplete="current-password" required>
+                <label for="login-pass">Password</label>
+            </div>
+
+            <button id="login-submit-btn" onclick="submit_login()">
+                <span class="login-btn-text">Connect</span>
+                <span class="login-btn-spinner"></span>
+            </button>
+            <p id="login-error"></p>
+        </div>
+    </div>
+
     <button id="auth-btn" onclick="enter_credentials()">🔒 Enter password to stream</button>
     
     <div class="player-bar">
@@ -88,18 +120,76 @@
     
     <script>
 
-        // Credentials are stored in memory only — never written to localStorage or the DOM.
-        let stream_user = "";
-        let stream_pass = "";
+        // Credentials are secure using cookies via backend now.
         let current_playlist = [];
-
+        
         function enter_credentials() {
-            stream_user = prompt("username:");
-            stream_pass = prompt("password:");
-            if (stream_user && stream_pass) {
-                document.getElementById('auth-btn').innerText = "🔓 Ready to stream";
-                document.getElementById('auth-btn').style.color = "#1db954";
-                document.getElementById('auth-btn').style.borderColor = "#1db954";
+            const overlay = document.getElementById('login-modal-overlay');
+            overlay.classList.remove('login-hidden');
+            document.getElementById('login-error').innerText = '';
+            document.getElementById('login-modal').classList.remove('login-shake');
+            // Auto-focus the first input after the fade-in transition.
+            setTimeout(() => document.getElementById('login-user').focus(), 350);
+        }
+
+        function close_login() {
+            document.getElementById('login-modal-overlay').classList.add('login-hidden');
+        }
+
+        // Allow pressing Enter in either input to submit the form.
+        document.getElementById('login-user').addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('login-pass').focus(); });
+        document.getElementById('login-pass').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit_login(); });
+
+        async function submit_login() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            const errorText = document.getElementById('login-error');
+            const submitBtn = document.getElementById('login-submit-btn');
+            const modal = document.getElementById('login-modal');
+
+            // Reset state.
+            errorText.innerText = '';
+            modal.classList.remove('login-shake');
+            submitBtn.classList.add('login-loading');
+            submitBtn.disabled = true;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user, pass })
+                });
+                if (res.ok) {
+                    submitBtn.classList.remove('login-loading');
+                    submitBtn.classList.add('login-success');
+                    submitBtn.querySelector('.login-btn-text').innerText = '✓ Connected';
+                    document.getElementById('auth-btn').innerText = "🔓 Ready to stream";
+                    document.getElementById('auth-btn').style.color = "#1db954";
+                    document.getElementById('auth-btn').style.borderColor = "#1db954";
+                    // Brief pause so the user sees the success state before the modal closes.
+                    setTimeout(() => {
+                        close_login();
+                        // Reset button for next time.
+                        submitBtn.classList.remove('login-success');
+                        submitBtn.querySelector('.login-btn-text').innerText = 'Connect';
+                        submitBtn.disabled = false;
+                        fetch_folders();
+                        load_tracks();
+                    }, 600);
+                } else {
+                    submitBtn.classList.remove('login-loading');
+                    submitBtn.disabled = false;
+                    errorText.innerText = 'Invalid credentials';
+                    // Trigger the shake animation.
+                    void modal.offsetWidth; // force reflow
+                    modal.classList.add('login-shake');
+                }
+            } catch (e) {
+                submitBtn.classList.remove('login-loading');
+                submitBtn.disabled = false;
+                errorText.innerText = 'Network error — check your connection';
+                void modal.offsetWidth;
+                modal.classList.add('login-shake');
             }
         }
 
@@ -311,7 +401,7 @@
 
             progress_bar.value = 0;
 
-            const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
+            const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&folder=${encodeURIComponent(current_folder)}`;
 
             // If the ghost player already buffered this exact URL, hand off its src
             // so playback starts without a fresh network request.
@@ -340,7 +430,7 @@
                 next_index = (current_track_index + 1) % current_playlist.length;
             }
             const raw_name = current_playlist[next_index];
-            const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
+            const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&folder=${encodeURIComponent(current_folder)}`;
             ghost_player.src = next_url;
             ghost_player.load();
         }

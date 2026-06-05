@@ -12,9 +12,31 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.use(express.json());
+
 // These are checked on every /stream request to gate playback behind a password.
 const user_auth = process.env.admin_user; 
 const pass_auth = process.env.admin_pass;
+
+function isAuthenticated(req) {
+    const cookies = req.headers.cookie;
+    if (!cookies) return false;
+    const match = cookies.match(new RegExp('(^| )auth_token=([^;]+)'));
+    if (match) {
+        return match[2] === encodeURIComponent(pass_auth);
+    }
+    return false;
+}
+
+app.post('/api/login', (req, res) => {
+    const { user, pass } = req.body;
+    if (user === user_auth && pass === pass_auth) {
+        res.setHeader('Set-Cookie', `auth_token=${encodeURIComponent(pass_auth)}; HttpOnly; Secure; Max-Age=${30 * 24 * 60 * 60}; SameSite=Strict; Path=/`);
+        res.status(200).json({ success: true });
+    } else {
+        res.status(401).json({ error: 'Invalid credentials' });
+    }
+});
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -61,6 +83,7 @@ async function get_mega_client() {
 
 // Each top-level folder in MEGA root is treated as a playlist.
 app.get('/api/folders', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).send('Unauthorized');
     try {
         const storage = await get_mega_client();
         const folders = storage.root.children
@@ -75,6 +98,7 @@ app.get('/api/folders', async (req, res) => {
 });
 
 app.get('/api/playlist', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).send('Unauthorized');
     const { folder } = req.query;
 
     try {
@@ -118,11 +142,9 @@ app.get('/api/playlist', async (req, res) => {
 // The browser sends a Range header when seeking or when the audio element
 // needs to resume from a specific byte offset, so we have to honour it.
 app.get('/stream', async (req, res) => {
-    const { filename, user, pass, folder } = req.query;
+    if (!isAuthenticated(req)) return res.status(401).send('no');
     
-    // Simple credential check — credentials travel in the query string which
-    // is fine here since the app is personal and already behind HTTPS on Vercel.
-    if (user !== user_auth || pass !== pass_auth) return res.status(401).send('no');
+    const { filename, folder } = req.query;
 
     try {
         const storage = await get_mega_client();
