@@ -571,6 +571,56 @@ body {
     display: none;
 }
 
+/* ── LOGIN MODAL ─────────────────────────────────────────────────────────── */
+#login-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+}
+#login-modal-overlay.login-hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+.login-modal {
+    flex-direction: column;
+    padding: 30px;
+    width: 320px;
+    gap: 15px;
+    text-align: center;
+}
+.login-modal input {
+    width: 100%;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 12px;
+    outline: none;
+    font-size: 15px;
+    transition: 0.2s;
+}
+.login-modal input:focus {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(29, 185, 84, 0.5);
+}
+.login-modal button {
+    width: 100%;
+    margin-top: 5px;
+}
+#login-error {
+    color: #ff4d4d;
+    font-size: 13px;
+    margin: 0;
+    min-height: 15px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE RESPONSIVE  (≤ 640px)
    Key changes vs desktop:

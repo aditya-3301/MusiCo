@@ -26,6 +26,18 @@
     <!-- Darkens the rest of the screen when the sidebar is open on mobile. -->
     <div id="sidebar-overlay" onclick="close_sidebar()"></div>
 
+    <!-- Secure Login Modal -->
+    <div id="login-modal-overlay" class="login-hidden">
+        <div class="login-modal custom-controls">
+            <h2 style="margin-top: 0;">Login to Stream</h2>
+            <input type="text" id="login-user" placeholder="Username" autocomplete="username">
+            <input type="password" id="login-pass" placeholder="Password" autocomplete="current-password">
+            <button id="login-submit-btn" onclick="submit_login()">Connect</button>
+            <p id="login-error"></p>
+            <button id="login-cancel-btn" onclick="close_login()" style="position: absolute; top: 10px; right: 10px; min-width: 30px; min-height: 30px; padding: 0; border-radius: 50%;">✕</button>
+        </div>
+    </div>
+
     <button id="auth-btn" onclick="enter_credentials()">🔒 Enter password to stream</button>
     
     <div class="player-bar">
@@ -88,18 +100,42 @@
     
     <script>
 
-        // Credentials are stored in memory only — never written to localStorage or the DOM.
-        let stream_user = "";
-        let stream_pass = "";
+        // Credentials are secure using cookies via backend now.
         let current_playlist = [];
-
+        
         function enter_credentials() {
-            stream_user = prompt("username:");
-            stream_pass = prompt("password:");
-            if (stream_user && stream_pass) {
-                document.getElementById('auth-btn').innerText = "🔓 Ready to stream";
-                document.getElementById('auth-btn').style.color = "#1db954";
-                document.getElementById('auth-btn').style.borderColor = "#1db954";
+            document.getElementById('login-modal-overlay').classList.remove('login-hidden');
+            document.getElementById('login-error').innerText = '';
+        }
+
+        function close_login() {
+            document.getElementById('login-modal-overlay').classList.add('login-hidden');
+        }
+
+        async function submit_login() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            const errorText = document.getElementById('login-error');
+            errorText.innerText = 'Connecting...';
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user, pass })
+                });
+                if (res.ok) {
+                    close_login();
+                    document.getElementById('auth-btn').innerText = "🔓 Ready to stream";
+                    document.getElementById('auth-btn').style.color = "#1db954";
+                    document.getElementById('auth-btn').style.borderColor = "#1db954";
+                    // Retry loading
+                    fetch_folders();
+                    load_tracks();
+                } else {
+                    errorText.innerText = 'Invalid credentials';
+                }
+            } catch (e) {
+                errorText.innerText = 'Network error';
             }
         }
 
@@ -311,7 +347,7 @@
 
             progress_bar.value = 0;
 
-            const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
+            const new_url = `/stream?filename=${encodeURIComponent(raw_name)}&folder=${encodeURIComponent(current_folder)}`;
 
             // If the ghost player already buffered this exact URL, hand off its src
             // so playback starts without a fresh network request.
@@ -340,7 +376,7 @@
                 next_index = (current_track_index + 1) % current_playlist.length;
             }
             const raw_name = current_playlist[next_index];
-            const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&user=${stream_user}&pass=${stream_pass}&folder=${encodeURIComponent(current_folder)}`;
+            const next_url = `/stream?filename=${encodeURIComponent(raw_name)}&folder=${encodeURIComponent(current_folder)}`;
             ghost_player.src = next_url;
             ghost_player.load();
         }
