@@ -8,6 +8,7 @@ process.on('uncaughtException',  (err) => console.error('Uncaught exception (kep
 const express = require('express');
 const { Storage } = require('megajs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -17,13 +18,14 @@ app.use(express.json());
 // These are checked on every /stream request to gate playback behind a password.
 const user_auth = process.env.admin_user; 
 const pass_auth = process.env.admin_pass;
+let session_token = null;
 
 function isAuthenticated(req) {
     const cookies = req.headers.cookie;
     if (!cookies) return false;
     const match = cookies.match(new RegExp('(^| )auth_token=([^;]+)'));
     if (match) {
-        return match[2] === encodeURIComponent(pass_auth);
+        return match[2] === session_token;
     }
     return false;
 }
@@ -31,7 +33,10 @@ function isAuthenticated(req) {
 app.post('/api/login', (req, res) => {
     const { user, pass } = req.body;
     if (user === user_auth && pass === pass_auth) {
-        res.setHeader('Set-Cookie', `auth_token=${encodeURIComponent(pass_auth)}; HttpOnly; Secure; Max-Age=${30 * 24 * 60 * 60}; SameSite=Strict; Path=/`);
+        session_token = crypto.randomBytes(32).toString('hex');
+        const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+        const securePart = isProduction ? ' Secure;' : '';
+        res.setHeader('Set-Cookie', `auth_token=${session_token}; HttpOnly;${securePart} Max-Age=${30 * 24 * 60 * 60}; SameSite=Strict; Path=/`);
         res.status(200).json({ success: true });
     } else {
         res.status(401).json({ error: 'Invalid credentials' });
@@ -52,31 +57,25 @@ async function get_mega_client() {
 
     console.log("Waking up server...");
     
-    connection_promise = new Promise(async (resolve, reject) => {
-        // MEGA login can stall silently. Kill it after 10 s and let the caller
-        // surface a "refresh now" message rather than hanging forever.
-        const timeout = setTimeout(() => {
-            connection_promise = null;
-            reject(new Error("MEGA_HANG: Connection timed out. Refresh now."));
-        }, 10000);
-
-        try {   
-            const storage = await new Storage({
+    connection_promise = (async () => {
+        try {
+            const loginPromise = new Storage({
                 email: process.env.MEGA_EMAIL,
                 password: process.env.MEGA_PASSWORD,
                 autologin: true
             }).ready;
             
-            clearTimeout(timeout);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("MEGA_HANG: Connection timed out. Refresh now.")), 10000);
+            });
+            
+            const storage = await Promise.race([loginPromise, timeoutPromise]);
             mega_storage = storage;
+            return mega_storage;
+        } finally {
             connection_promise = null;
-            resolve(mega_storage);
-        } catch (e) {
-            clearTimeout(timeout);
-            connection_promise = null;
-            reject(e);
         }
-    });
+    })();
 
     return connection_promise;
 }
@@ -93,7 +92,7 @@ app.get('/api/folders', async (req, res) => {
         res.json(folders);
     } catch (err) {
         console.error("Folder Fetch Error:", err);
-        res.status(500).send(`Error: ${err.message}`);
+        res.status(500).send("Error: Failed to load folders. Please refresh.");
     }
 });
 
@@ -134,7 +133,7 @@ app.get('/api/playlist', async (req, res) => {
         // Full reset on any unhandled error so the next request starts fresh.
         mega_storage = null;
         connection_promise = null;
-        res.status(500).send(`Error 500:Error is -> ${err.message}\n\n[If it says EBLOCKED, i have to change my mega password(Its a very rare error)]`);
+        res.status(500).send("Error 500: Failed to load playlist. Please try again.");
     }
 });
 
@@ -183,6 +182,10 @@ app.get('/stream', async (req, res) => {
             });
             
             const download_stream = song_file.download({ start, end });
+            download_stream.on('error', (err) => {
+                console.error("MEGA stream error:", err.message);
+                res.destroy();
+            });
             download_stream.pipe(res);
         } else {
             // No Range header — some browsers (especially mobile) send a plain GET
@@ -201,6 +204,10 @@ app.get('/stream', async (req, res) => {
                 'Cache-Control': 'private, max-age=3600',
             });
             const download_stream = song_file.download({ start: 0, end });
+            download_stream.on('error', (err) => {
+                console.error("MEGA stream error:", err.message);
+                res.destroy();
+            });
             download_stream.pipe(res);
         }
 

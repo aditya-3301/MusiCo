@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <!-- Disable user zoom on mobile — the UI is fixed-layout and zoom breaks the player bar. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MusiCo — Personal music streaming from MEGA.nz">
+    <link rel="icon" href="data:,">
     <!-- iOS home-screen / PWA chrome settings -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,8 +14,8 @@
     <title>MusiCo - by Aditya</title>
     <link rel="stylesheet" href="style.css">
     <!-- GSAP core + Draggable plugin — used for the elastic snap-back on the controls pill. -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/Draggable.min.js"></script>
 </head>
 <body>
     <!-- particles.js renders its canvas into this div. z-index keeps it behind everything. -->
@@ -108,7 +110,7 @@
             <div id="playlist-wrapper">
                 <h3 style="margin: 10px 0 10px 10px; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Playlists</h3>
                 <div id="playlist-container">
-                    <div style="padding: 10px; font-size: 13px; color: #9ca3af;">Loading folders...</div>
+                    <div class="sidebar-loading-text">Loading folders...</div>
                 </div>
             </div>
         </nav>
@@ -225,11 +227,17 @@
         async function fetch_folders() {
             const container   = document.getElementById('playlist-container');
             const mobile_tabs = document.getElementById('mobile-folder-tabs');
-            if (container)   container.innerHTML = '<div style="padding: 10px; font-size: 13px; color: #9ca3af;">Loading folders...</div>';
+            if (container)   container.innerHTML = '<div class="sidebar-loading-text">Loading folders...</div>';
             if (mobile_tabs) mobile_tabs.innerHTML = '';
 
             try {
                 const res = await fetch(`/api/folders`);
+                if (res.status === 401) {
+                    if (container) container.innerHTML = '<div class="sidebar-error-text">Login to see your music.</div>';
+                    // Auto-open login if unauthorized
+                    enter_credentials();
+                    return;
+                }
                 if (!res.ok) throw new Error("Failed to fetch folders");
                 const folders = await res.json();
                 if (container) container.innerHTML = '';
@@ -286,7 +294,7 @@
                     }
                 });
             } catch (error) {
-                if (container) container.innerHTML = '<div style="padding: 10px; color: #ff4d4d;">Failed to load folders.</div>';
+                if (container) container.innerHTML = '<div class="sidebar-error-text">Failed to load folders.</div>';
                 console.error("Folder Fetch Error:", error);
             }
         }
@@ -330,6 +338,10 @@
 
             try {
                 const res = await fetch(`/api/playlist?folder=${encodeURIComponent(current_folder)}`);
+                if (res.status === 401) {
+                    document.getElementById('track-list').innerText = 'Login to see your music.';
+                    return;
+                }
                 if (!res.ok) {
                     const error_msg = await res.text();
                     console.error("Server Error:", error_msg);
@@ -357,7 +369,18 @@
                     const div = document.createElement('div');
                     div.className = 'track-item';
                     div.dataset.index = idx;
-                    div.innerHTML = `<div class="track-title">${title}</div><div class="track-artist">${artist}</div>`;
+                    
+                    const titleEl = document.createElement('div');
+                    titleEl.className = 'track-title';
+                    titleEl.textContent = title;
+                    
+                    const artistEl = document.createElement('div');
+                    artistEl.className = 'track-artist';
+                    artistEl.textContent = artist;
+                    
+                    div.appendChild(titleEl);
+                    div.appendChild(artistEl);
+                    
                     div.onclick = () => play_song(raw_item, title, artist);
 
                     // The queue button prepends to play_next_queue, so the chosen track
@@ -518,13 +541,6 @@
         audio.addEventListener('play',  () => play_btn.innerText = '⏸');
         audio.addEventListener('pause', () => play_btn.innerText = '▶');
 
-        // Just a debug log — useful to see how far ahead the ghost player has buffered.
-        ghost_player.addEventListener('progress', () => {
-            if (ghost_player.buffered.length > 0) {
-                const loaded = Math.round(ghost_player.buffered.end(0) / 1024 / 1024);
-            }
-        });
-
         // If the MEGA stream drops mid-track, skip to the next song after a short delay
         // rather than leaving the player frozen on an error state.
         audio.addEventListener('error', () => {
@@ -539,7 +555,7 @@
         let current_track_title = "";
         audio.addEventListener('waiting', () => {
             current_track_title = document.getElementById('np-title').innerText;
-            if (current_track_title !== "STREAM ERROR - Try again") {
+            if (current_track_title !== "⚠️ Stream error / Corrupted file. Skipping...") {
                 document.getElementById('np-title').innerText = "Loading stream...";
             }
         });
@@ -560,6 +576,17 @@
             if (time_remaining <= 30 && !has_preloaded_next) {
                 has_preloaded_next = true;
                 preload_next_track();
+            }
+            
+            // Sync with Media Session API (lock-screen scrubber)
+            if ('mediaSession' in navigator && audio.duration) {
+                try {
+                    navigator.mediaSession.setPositionState({
+                        duration:     audio.duration,
+                        playbackRate: audio.playbackRate,
+                        position:     audio.currentTime
+                    });
+                } catch(e) {}
             }
         });
 
@@ -597,11 +624,7 @@
             navigator.mediaSession.metadata = new MediaMetadata({
                 title:  title  || 'Unknown Title',
                 artist: artist || 'Unknown Artist',
-                album:  current_folder || 'MusiCo',
-                artwork: [
-                    { src: 'https://raw.githubusercontent.com/aditya-3301/MusiCo/main/public/icon-192.png', sizes: '192x192', type: 'image/png' },
-                    { src: 'https://raw.githubusercontent.com/aditya-3301/MusiCo/main/public/icon-512.png', sizes: '512x512', type: 'image/png' }
-                ]
+                album:  current_folder || 'MusiCo'
             });
 
             navigator.mediaSession.setActionHandler('play',         () => { audio.play();  play_btn.innerText = '⏸'; });
@@ -614,25 +637,14 @@
         }
 
         // Keeps the lock-screen scrubber bar in sync with actual playback position.
-        // Wrapped in try/catch because setPositionState can throw if duration is NaN.
-        audio.addEventListener('timeupdate', () => {
-            if ('mediaSession' in navigator && audio.duration) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration:     audio.duration,
-                        playbackRate: audio.playbackRate,
-                        position:     audio.currentTime
-                    });
-                } catch(e) {}
-            }
-        });
+        // Handled in the main timeupdate listener above.
 
         // Boot sequence: load folder list and default playlist on page load.
         fetch_folders();
         load_tracks();
     </script>
 
-    <script src="particles.js"></script>
+    <script defer src="particles.js"></script>
     <script>
         particlesJS("particles-js", {
             "particles": {
