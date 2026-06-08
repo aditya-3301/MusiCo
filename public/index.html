@@ -646,48 +646,53 @@
 
     <script defer src="particles.js"></script>
     <script>
-        particlesJS("particles-js", {
-            "particles": {
-                "number": { "value": 60 },
-                "color": { "value": "#ffffff" },
-                "shape": { "type": "circle" },
-                "opacity": { "value": 0.4 },
-                "size": { "value": 2.5 },
-                "line_linked": { "enable": true, "distance": 130, "color": "#ffffff", "opacity": 0.25, "width": 1 },
-                "move": { "enable": true, "speed": 1.2 }
-            },
-            "interactivity": {
-                "detect_on": "canvas",
-                "events": { "onhover": { "enable": true, "mode": "grab" } }
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof particlesJS !== 'undefined') {
+                particlesJS("particles-js", {
+                    "particles": {
+                        "number": { "value": 60 },
+                        "color": { "value": "#ffffff" },
+                        "shape": { "type": "circle" },
+                        "opacity": { "value": 0.4 },
+                        "size": { "value": 2.5 },
+                        "line_linked": { "enable": true, "distance": 130, "color": "#ffffff", "opacity": 0.25, "width": 1 },
+                        "move": { "enable": true, "speed": 1.2 }
+                    },
+                    "interactivity": {
+                        "detect_on": "canvas",
+                        "events": { "onhover": { "enable": true, "mode": "grab" } }
+                    }
+                });
             }
+
+            if (typeof gsap !== 'undefined' && typeof Draggable !== 'undefined') {
+                gsap.registerPlugin(Draggable);
+
+                // Draggable is only enabled on desktop. On touch devices the elastic snap
+                // would fight with native scroll, so we skip registering it entirely.
+                if (!('ontouchstart' in window)) {
+                    Draggable.create(".custom-controls", {
+                        type: "x, y",
+                        dragClickables: false,
+                        minimumMovement: 10,
+                        onRelease: function () {
+                            gsap.to(this.target, { x: 0, y: 0, duration: 1.5, ease: "elastic.out(1,0.3)" });
+                        }
+                    });
+                    Draggable.create("#playlist-wrapper", {
+                        type: "x, y",
+                        dragClickables: false,
+                        minimumMovement: 10,
+                        onRelease: function () {
+                            gsap.to(this.target, { x: 0, y: 0, duration: 0.9, ease: "elastic.out(1,0.3)" });
+                        }
+                    });
+                }
+            }
+            
+            // App launches in shuffle mode by default
+            toggle_shuffle();
         });
-
-        gsap.registerPlugin(Draggable);
-
-        // Draggable is only enabled on desktop. On touch devices the elastic snap
-        // would fight with native scroll, so we skip registering it entirely.
-        if (!('ontouchstart' in window)) {
-            Draggable.create(".custom-controls", {
-                type: "x, y",
-                dragClickables: false,
-                minimumMovement: 10,
-                onRelease: function () {
-                    gsap.to(this.target, { x: 0, y: 0, duration: 1.5, ease: "elastic.out(1,0.3)" });
-                }
-            });
-            Draggable.create("#playlist-wrapper", {
-                type: "x, y",
-                dragClickables: false,
-                minimumMovement: 10,
-                onRelease: function () {
-                    gsap.to(this.target, { x: 0, y: 0, duration: 0.9, ease: "elastic.out(1,0.3)" });
-                }
-            });
-        }
-
-        // App launches in shuffle mode by default — calling toggle_shuffle() once flips is_shuffle
-        // to true and updates the button state without duplicating the activation logic.
-        toggle_shuffle();
     </script>
 
     <!--

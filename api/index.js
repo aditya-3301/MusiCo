@@ -18,7 +18,9 @@ app.use(express.json());
 // These are checked on every /stream request to gate playback behind a password.
 const user_auth = process.env.admin_user; 
 const pass_auth = process.env.admin_pass;
-let session_token = null;
+
+// Deterministic token so all serverless lambda instances accept it without shared memory
+const session_token = crypto.createHash('sha256').update(pass_auth || '').digest('hex');
 
 function isAuthenticated(req) {
     const cookies = req.headers.cookie;
@@ -33,7 +35,6 @@ function isAuthenticated(req) {
 app.post('/api/login', (req, res) => {
     const { user, pass } = req.body;
     if (user === user_auth && pass === pass_auth) {
-        session_token = crypto.randomBytes(32).toString('hex');
         const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
         const securePart = isProduction ? ' Secure;' : '';
         res.setHeader('Set-Cookie', `auth_token=${session_token}; HttpOnly;${securePart} Max-Age=${30 * 24 * 60 * 60}; SameSite=Strict; Path=/`);
@@ -58,6 +59,7 @@ async function get_mega_client() {
     console.log("Waking up server...");
     
     connection_promise = (async () => {
+        let timeoutHandle;
         try {
             const loginPromise = new Storage({
                 email: process.env.MEGA_EMAIL,
@@ -66,13 +68,15 @@ async function get_mega_client() {
             }).ready;
             
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error("MEGA_HANG: Connection timed out. Refresh now.")), 10000);
+                timeoutHandle = setTimeout(() => reject(new Error("MEGA_HANG: Connection timed out. Refresh now.")), 10000);
             });
             
             const storage = await Promise.race([loginPromise, timeoutPromise]);
+            clearTimeout(timeoutHandle);
             mega_storage = storage;
             return mega_storage;
         } finally {
+            clearTimeout(timeoutHandle);
             connection_promise = null;
         }
     })();
