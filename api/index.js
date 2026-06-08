@@ -93,6 +93,8 @@ app.get('/api/folders', async (req, res) => {
             .filter(f => f.directory)
             .map(f => f.name);
             
+        // Cache this at the browser level for 5 minutes to make UI navigation instant
+        res.setHeader('Cache-Control', 'private, max-age=300');
         res.json(folders);
     } catch (err) {
         console.error("Folder Fetch Error:", err);
@@ -131,6 +133,8 @@ app.get('/api/playlist', async (req, res) => {
             .filter(f => !f.directory)
             .map(f => f.name.replace('.mp3', '').replace('.m4a', '')); 
             
+        // Cache this at the browser level for 5 minutes
+        res.setHeader('Cache-Control', 'private, max-age=300');
         res.json(songs);
     } catch (err) {
         console.error("Critical Playlist Error:", err);
