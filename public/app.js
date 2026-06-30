@@ -72,9 +72,11 @@ async function submit_login() {
 }
 
 let current_track_index = -1;
-let is_shuffle = false; 
+let is_shuffle = false;
 let current_folder = 'main';
 let play_next_queue = [];   // tracks queued with the ⏭ "play next" button
+let play_history = [];      // stack of previously played track indices for "previous" button
+let dont_add_to_history = false; // flag to bypass adding to history when navigating back
 
 // ghost_player silently preloads the upcoming track while the current one plays,
 // so switching songs feels instant without any buffering gap.
@@ -136,9 +138,10 @@ async function fetch_folders() {
                         const match = [...mobile_tabs.querySelectorAll('.mobile-folder-tab')].find(el => el.dataset.folder === folderName);
                         if (match) match.classList.add('active');
                     }
-                    // Clear any leftover search query when switching playlist.
+                    // Clear and close search results on folder switch
                     const searchBox = document.getElementById('search-box');
-                    if (searchBox) { searchBox.value = ''; filter_songs(); }
+                    if (searchBox) searchBox.value = '';
+                    document.getElementById('search-results')?.classList.remove('open');
                     load_tracks();
                     close_sidebar();
                 };
@@ -162,8 +165,10 @@ async function fetch_folders() {
                         const match = [...container.querySelectorAll('.folder-item')].find(el => el.innerText === folderName);
                         if (match) match.classList.add('active');
                     }
+                    // Clear and close search results on folder switch (mobile)
                     const mobileSearch = document.getElementById('mobile-search-box');
-                    if (mobileSearch) { mobileSearch.value = ''; filter_songs(); }
+                    if (mobileSearch) mobileSearch.value = '';
+                    document.getElementById('mobile-search-results')?.classList.remove('open');
                     load_tracks();
                 };
                 mobile_tabs.appendChild(tab);
@@ -211,6 +216,10 @@ function toggle_loop() {
 async function load_tracks() {
     document.getElementById('track-list').innerText = 'loading tracks...';
     document.getElementById('folder-title').innerText = current_folder;
+
+    // Clear play history when playlist changes (folder switch)
+    play_history = [];
+    current_track_index = -1;
 
     try {
         const res = await fetch(`/api/playlist?folder=${encodeURIComponent(current_folder)}`);
@@ -284,7 +293,28 @@ async function load_tracks() {
 
 function play_song(raw_name, title, artist) {
     has_preloaded_next = false;
-    current_track_index = current_playlist.indexOf(raw_name);
+    const new_index = current_playlist.indexOf(raw_name);
+
+    // Track play history for "previous" button — push old index before updating
+    if (current_track_index !== -1 && current_track_index !== new_index && !dont_add_to_history) {
+        play_history.push(current_track_index);
+        // Cap history to last 50 tracks to avoid memory growth
+        if (play_history.length > 50) play_history.shift();
+    }
+    dont_add_to_history = false; // Reset flag
+    current_track_index = new_index;
+
+    // Auto-parse title and artist from filename if not provided
+    if (!title) {
+        const clean_name = raw_name.replace('.mp3', '').replace('.m4a', '').replace('.wav', '').replace('.flac', '');
+        title = clean_name;
+        artist = '';
+        if (clean_name.includes('-')) {
+            const parts = clean_name.split('-');
+            artist = parts[0].trim();
+            title = parts.slice(1).join('-').trim();
+        }
+    }
 
     // Highlight the active track in the list.
     document.querySelectorAll('.track-item').forEach(el => el.classList.remove('playing'));
@@ -334,20 +364,118 @@ function preload_next_track() {
     ghost_player.load();
 }
 
-function filter_songs() {
-    // Use whichever search box is currently visible:
-    // mobile-search-box on ≤640px, sidebar search-box on desktop.
-    const mobile_box  = document.getElementById('mobile-search-box');
-    const desktop_box = document.getElementById('search-box');
-    const is_mobile   = window.matchMedia('(max-width: 640px)').matches;
-    const active_box  = is_mobile ? mobile_box : desktop_box;
-    if (!active_box) return;
-    const query = active_box.value.toLowerCase();
-    // Show/hide existing DOM nodes — no re-render needed.
-    document.querySelectorAll('.track-item').forEach(track => {
-        track.style.display = track.innerText.toLowerCase().includes(query) ? 'flex' : 'none';
-    });
+// ── GLOBAL SEARCH ─────────────────────────────────────────────────────
+let global_search_debounce = null;
+let global_search_abort = null;
+
+async function global_search(query, is_mobile = false) {
+    const results_box = is_mobile
+        ? document.getElementById('mobile-search-results')
+        : document.getElementById('search-results');
+    const search_box = is_mobile
+        ? document.getElementById('mobile-search-box')
+        : document.getElementById('search-box');
+
+    if (!results_box || !search_box) return;
+
+    clearTimeout(global_search_debounce);
+    if (global_search_abort) global_search_abort.abort();
+
+    const q = query.trim();
+    if (q.length < 2) {
+        results_box.classList.remove('open');
+        results_box.innerHTML = '';
+        return;
+    }
+
+    global_search_debounce = setTimeout(async () => {
+        try {
+            global_search_abort = new AbortController();
+            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`, {
+                signal: global_search_abort.signal
+            });
+            if (!res.ok) throw new Error('Search failed');
+            const results = await res.json();
+
+            if (results.length === 0) {
+                results_box.innerHTML = '<div class="search-empty">No matches found</div>';
+                results_box.classList.add('open');
+                return;
+            }
+
+            results_box.innerHTML = results.map(r => `
+                <div class="search-result-item"
+                     data-folder="${r.folder}"
+                     data-filename="${r.filename}"
+                     data-title="${r.title.replace(/"/g, '&quot;')}"
+                     onclick="global_search_select(this)">
+                    <span class="search-result-icon">🎵</span>
+                    <div class="search-result-info">
+                        <div class="search-result-title">${r.title}</div>
+                        <div class="search-result-folder">${r.folder}</div>
+                    </div>
+                </div>
+            `).join('');
+            results_box.classList.add('open');
+        } catch (e) {
+            if (e.name !== 'AbortError') {
+                console.error('Global search error:', e);
+                results_box.innerHTML = '<div class="search-empty">Search failed</div>';
+                results_box.classList.add('open');
+            }
+        }
+    }, 180); // debounce
 }
+
+function global_search_select(el) {
+    const folder = el.dataset.folder;
+    const filename = el.dataset.filename;
+
+    // Close search results
+    document.getElementById('search-results')?.classList.remove('open');
+    document.getElementById('mobile-search-results')?.classList.remove('open');
+    const searchBox = document.getElementById('search-box');
+    if (searchBox) searchBox.value = '';
+    const mobileSearchBox = document.getElementById('mobile-search-box');
+    if (mobileSearchBox) mobileSearchBox.value = '';
+
+    // Switch to that folder if different
+    if (folder !== current_folder) {
+        current_folder = folder;
+        // Update sidebar active state
+        document.querySelectorAll('.folder-item').forEach(item => {
+            item.classList.toggle('active', item.innerText === folder);
+        });
+        document.querySelectorAll('.mobile-folder-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.folder === folder);
+        });
+        load_tracks().then(() => {
+            // After tracks load, play the selected song
+            play_song(filename);
+        });
+    } else {
+        // Same folder, just play
+        play_song(filename);
+    }
+}
+
+// Close search results when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrapper') && !e.target.closest('#mobile-top-row')) {
+        document.getElementById('search-results')?.classList.remove('open');
+        document.getElementById('mobile-search-results')?.classList.remove('open');
+    }
+});
+
+// Also close on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        document.getElementById('search-results')?.classList.remove('open');
+        document.getElementById('mobile-search-results')?.classList.remove('open');
+        document.getElementById('search-box')?.blur();
+        document.getElementById('mobile-search-box')?.blur();
+    }
+});
 
 const audio = document.getElementById('audio-player');
 const play_btn = document.getElementById('play-btn');
@@ -357,37 +485,48 @@ const total_time_text = document.getElementById('total-time');
 
 function play_next() {
     if (current_playlist.length === 0) return;
+    let next_index = -1;
     // Manual "play next" queue takes priority over shuffle/sequential order.
     if (play_next_queue.length > 0) {
         const next_raw = play_next_queue.shift();
         const idx = current_playlist.indexOf(next_raw);
-        if (idx !== -1) { current_track_index = idx; load_track_from_index(idx); return; }
+        if (idx !== -1) {
+            load_track_from_index(idx);
+            return;
+        }
     }
     if (is_shuffle && current_playlist.length > 1) {
         let random_index = current_track_index;
         while (random_index === current_track_index) {
             random_index = Math.floor(Math.random() * current_playlist.length);
         }
-        current_track_index = random_index;
+        next_index = random_index;
     } else {
-        current_track_index = (current_track_index + 1) % current_playlist.length;
+        next_index = (current_track_index + 1) % current_playlist.length;
     }
-    load_track_from_index(current_track_index);
+    load_track_from_index(next_index);
 }
 
 function play_prev() {
     if (current_playlist.length === 0) return;
-    if (is_shuffle && current_playlist.length > 1) {
+    let prev_index = -1;
+    dont_add_to_history = true; // Tell play_song to not push current track to play_history
+
+    // Use play history regardless of shuffle mode — "previous" means "what played before"
+    if (play_history.length > 0) {
+        prev_index = play_history.pop();
+    } else if (is_shuffle && current_playlist.length > 1) {
+        // Fallback: if no history yet (first track), pick random
         let random_index = current_track_index;
         while (random_index === current_track_index) {
             random_index = Math.floor(Math.random() * current_playlist.length);
         }
-        current_track_index = random_index;
+        prev_index = random_index;
     } else {
-        current_track_index--;
-        if (current_track_index < 0) current_track_index = current_playlist.length - 1;
+        prev_index = current_track_index - 1;
+        if (prev_index < 0) prev_index = current_playlist.length - 1;
     }
-    load_track_from_index(current_track_index);
+    load_track_from_index(prev_index);
 }
 
 // Re-parses the filename at a given index and calls play_song.
