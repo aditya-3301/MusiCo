@@ -216,7 +216,7 @@ app.get('/stream', async (req, res) => {
             const parts = range.replace(/bytes=/, "").split("-");
             const start = parseInt(parts[0], 10);
             // If the browser doesn't specify an end byte, serve at least 512 KB.
-            const MIN_CHUNK = 512 * 1024;
+            const MIN_CHUNK = 128 * 1024;
             const end = parts[1] ? parseInt(parts[1], 10) : Math.min(start + MIN_CHUNK, size - 1);
             const chunksize = (end - start) + 1;
 
@@ -239,7 +239,7 @@ app.get('/stream', async (req, res) => {
             // and then wait for the ENTIRE file before starting playback.
             // Fix: always respond 206 from byte 0 so the browser knows it's a
             // partial/streamable response and starts playing immediately.
-            const MIN_CHUNK = 512 * 1024;
+            const MIN_CHUNK = 128 * 1024;
             const end = Math.min(MIN_CHUNK - 1, size - 1);
             const chunksize = end + 1;
 
