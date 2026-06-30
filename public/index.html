@@ -94,7 +94,8 @@
          Hidden on desktop via CSS; the sidebar handles that role there.          -->
     <div id="mobile-top-bar">
         <div id="mobile-top-row">
-            <input type="text" id="mobile-search-box" placeholder="🔍 Search songs..." oninput="filter_songs()">
+            <input type="text" id="mobile-search-box" placeholder="🔍 Search all playlists..." oninput="global_search(this.value, true)">
+            <div id="mobile-search-results" class="search-results"></div>
         </div>
         <div id="mobile-folder-tabs"></div>
     </div>
@@ -105,7 +106,11 @@
                 <h2>Welcome, Aditya</h2>
                 <button id="sidebar-close-btn" onclick="close_sidebar()" aria-label="Close sidebar">✕</button>
             </div>
-            <input type="text" id="search-box" placeholder="Search" onkeyup="filter_songs()">
+            <!-- Global Search (Desktop) -->
+            <div class="search-wrapper">
+                <input type="text" id="search-box" placeholder="Search" oninput="global_search(this.value)">
+                <div id="search-results" class="search-results"></div>
+            </div>
             
             <div id="playlist-wrapper">
                 <h3 style="margin: 10px 0 10px 10px; font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 1px;">Playlists</h3>

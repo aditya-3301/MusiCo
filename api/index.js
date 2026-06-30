@@ -145,6 +145,45 @@ app.get('/api/playlist', async (req, res) => {
     }
 });
 
+// ── GLOBAL SEARCH ──────────────────────────────────────────────────
+// Searches across all folders (playlists) for tracks matching query.
+app.get('/api/search', async (req, res) => {
+    if (!isAuthenticated(req)) return res.status(401).send('Unauthorized');
+    const { q } = req.query;
+    if (!q || q.trim().length < 2) return res.json([]);
+
+    try {
+        const storage = await get_mega_client();
+        const query = q.trim().toLowerCase();
+        const results = [];
+
+        storage.root.children
+            .filter(f => f.directory)
+            .forEach(folder => {
+                folder.children
+                    .filter(f => !f.directory)
+                    .forEach(file => {
+                        const clean_name = file.name.replace('.mp3', '').replace('.m4a', '');
+                        if (clean_name.toLowerCase().includes(query)) {
+                            results.push({
+                                title: clean_name,
+                                folder: folder.name,
+                                // Include original filename for streaming
+                                filename: file.name
+                            });
+                        }
+                    });
+            });
+
+        // Cache for 2 minutes — search results change less frequently
+        res.setHeader('Cache-Control', 'private, max-age=120');
+        res.json(results.slice(0, 100)); // Cap at 100 results
+    } catch (err) {
+        console.error("Search Error:", err);
+        res.status(500).send("Search failed");
+    }
+});
+
 // Range-request aware streaming endpoint.
 // The browser sends a Range header when seeking or when the audio element
 // needs to resume from a specific byte offset, so we have to honour it.
